@@ -1,6 +1,7 @@
 from sklearn.impute import KNNImputer
 from utils import *
-
+from tabulate import tabulate
+import matplotlib.pyplot as plt
 
 def knn_impute_by_user(matrix, valid_data, k):
     """ Fill in the missing values using k-Nearest Neighbors based on
@@ -23,6 +24,27 @@ def knn_impute_by_user(matrix, valid_data, k):
     return acc
 
 
+def sparse_matrix_evaluate_item(data, matrix, threshold=0.5):
+    """ Given the sparse matrix represent, return the accuracy of the prediction on data.
+
+    :param data: A dictionary {user_id: list, question_id: list, is_correct: list}
+    :param matrix: 2D matrix
+    :param threshold: float
+    :return: float
+    """
+    total_prediction = 0
+    total_accurate = 0
+    for i in range(len(data["is_correct"])):
+        cur_user_id = data["user_id"][i]
+        cur_question_id = data["question_id"][i]
+        if matrix[cur_question_id, cur_user_id] >= threshold and data["is_correct"][i]:
+            total_accurate += 1
+        if matrix[cur_question_id, cur_user_id] < threshold and not data["is_correct"][i]:
+            total_accurate += 1
+        total_prediction += 1
+    return total_accurate / float(total_prediction)
+
+
 def knn_impute_by_item(matrix, valid_data, k):
     """ Fill in the missing values using k-Nearest Neighbors based on
     question similarity. Return the accuracy on valid_data.
@@ -37,7 +59,10 @@ def knn_impute_by_item(matrix, valid_data, k):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    acc = None
+    nbrs = KNNImputer(n_neighbors=k)
+    mat = nbrs.fit_transform(matrix.T)
+    acc = sparse_matrix_evaluate_item(valid_data, mat)
+    print("Validation Accuracy: {}".format(acc))
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -60,7 +85,68 @@ def main():
     # the best performance and report the test accuracy with the        #
     # chosen k*.                                                        #
     #####################################################################
-    pass
+
+    # Note that:
+    # Please make sure to comment out other parts when running a single part
+    # part a and b should be ran at the same time
+
+    # part a
+    k_list = [1, 6, 11, 16, 21, 26]
+    accuracy_list = []  # used to store the acc for each k
+    for k in k_list:
+        accuracy_list.append(knn_impute_by_user(sparse_matrix, val_data, k))
+
+    table = [["K value", "Accuracy"]]
+    for i in range(len(accuracy_list)):
+        table.append([k_list[i], accuracy_list[i]])
+    print(tabulate(table, headers='firstrow', tablefmt='fancy_grid'))
+
+    plt.xlabel("Values for k")
+    plt.ylabel("Accuracy")
+    plt.plot(k_list, accuracy_list)
+    plt.show()
+
+    # part b
+    best_k = k_list[accuracy_list.index(max(accuracy_list))]
+    test_accuracy = knn_impute_by_user(sparse_matrix, test_data, best_k)
+    print("The best performance k value for valid data is {}\n"
+          "Its performance on test data is {}".format(best_k, test_accuracy))
+    #####################################################################
+    # part c
+    k_list = [1, 6, 11, 16, 21, 26]
+    accuracy_list = []  # used to store the acc for each k
+    for k in k_list:
+        accuracy_list.append(knn_impute_by_item(sparse_matrix, val_data, k))
+
+    table = [["K value", "Accuracy"]]
+    for i in range(len(accuracy_list)):
+        table.append([k_list[i], accuracy_list[i]])
+    print(tabulate(table, headers='firstrow', tablefmt='fancy_grid'))
+
+    plt.xlabel("Values for k")
+    plt.ylabel("Accuracy")
+    plt.plot(k_list, accuracy_list)
+    plt.show()
+
+    best_k = k_list[accuracy_list.index(max(accuracy_list))]
+    test_accuracy = knn_impute_by_user(sparse_matrix, test_data, best_k)
+    print("The best performance k value for valid data is {}\n"
+          "Its performance on test data is {}".format(best_k, test_accuracy))
+    #####################################################################
+    # part d
+    k_list = [1, 6, 11, 16, 21, 26]
+    _user = []
+    _item = []
+    for k in k_list:
+        _user.append(knn_impute_by_user(sparse_matrix, val_data, k))
+        _item.append(knn_impute_by_item(sparse_matrix, val_data, k))
+    plt.plot(k_list, _user, label="user-based filtering")
+    plt.plot(k_list, _item, label="item-based filtering")
+    plt.xlabel("Values for k")
+    plt.ylabel("Accuracy")
+    plt.title('Compare the test performance between user- and item- based')
+    plt.legend()
+    plt.show()
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
