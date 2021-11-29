@@ -1,6 +1,7 @@
 from utils import *
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def sigmoid(x):
@@ -33,7 +34,7 @@ def neg_log_likelihood(data, theta, beta):
     log_lklihood = 0
     for i in range(len(is_correct)):
         # if c_ij = 1
-        if is_correct[i]:
+        if is_correct[i] == 1:
             log_lklihood += theta[user_id[i]] - beta[question_id[i]] \
                             - np.logaddexp(0, theta[user_id[i]] -
                                            beta[question_id[i]])
@@ -74,15 +75,20 @@ def update_theta_beta(data, lr, theta, beta):
     question_id = data["question_id"]
     is_correct = data["is_correct"]
 
+    theta_gradient = np.zeros(len(theta))
+    beta_gradient = np.zeros(len(beta))
+
     for i in range(len(is_correct)):
         # compute the derivatives
         temp = sigmoid(theta[user_id[i]] - beta[question_id[i]])
         grad_theta = is_correct[i] - temp
         grad_beta = - grad_theta
-
-        # apply the update
-        theta[user_id[i]] += lr * grad_theta
-        beta[question_id[i]] += lr * grad_beta
+        # apply the update to theta_gradient/beta_gradient
+        theta_gradient[user_id[i]] += grad_theta
+        beta_gradient[question_id[i]] += grad_beta
+    # apply the update
+    theta += lr * theta_gradient
+    beta += lr * beta_gradient
 
     #####################################################################
     #                       END OF YOUR CODE                            #
@@ -104,26 +110,28 @@ def irt(data, val_data, lr, iterations):
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    theta = np.random.rand(542)     # num of students
-    beta = np.random.rand(1774)     # num of questions
+    theta = np.random.rand(542)  # num of students
+    beta = np.random.rand(1774)  # num of questions
 
     val_acc_lst = []
-    train_acc_lst = []
+    data_acc_lst = []
     val_like_lst = []
     train_like_lst = []
 
     for i in range(iterations):
         neg_lld_train = neg_log_likelihood(data, theta=theta, beta=beta)
         neg_lld_val = neg_log_likelihood(val_data, theta=theta, beta=beta)
-        score_train = evaluate(data=data, theta=theta, beta=beta)
+        score_data = evaluate(data=data, theta=theta, beta=beta)
         score_val = evaluate(data=val_data, theta=theta, beta=beta)
         val_acc_lst.append(score_val)
-        train_acc_lst.append(score_train)
+        data_acc_lst.append(score_data)
+        val_like_lst.append(-neg_lld_val)
+        train_like_lst.append(-neg_lld_train)
         # print("NLLK: {} \t Score: {}".format(neg_lld, score))
         theta, beta = update_theta_beta(data, lr, theta, beta)
 
     # TODO: You may change the return values to achieve what you want.
-    return theta, beta, val_acc_lst
+    return theta, beta, val_acc_lst, data_acc_lst, val_like_lst, train_like_lst
 
 
 def evaluate(data, theta, beta):
@@ -157,14 +165,54 @@ def main():
     # Tune learning rate and number of iterations. With the implemented #
     # code, report the validation and test accuracy.                    #
     #####################################################################
-    pass
+    learning_rate = 0.001
+    number_of_iteration = 150
+    iteration_list = [*range(1, number_of_iteration + 1, 1)]
+    theta, beta, val_acc_list, train_acc_list, val_like_lst, train_like_lst = irt(train_data, val_data, learning_rate, number_of_iteration)
+
+    # report the validation and test accuracy
+    plt.plot(val_acc_list, label="validation accuracy")
+    plt.plot(train_acc_list, label="training accuracy")
+    plt.title("Training Curve")
+    plt.xlabel("num of iteration")
+    plt.ylabel("accuracy")
+    plt.legend()
+    plt.show()
+
+    # plot showing the training and valid log-likelihoods
+
+    plt.plot(iteration_list, val_like_lst, label="validation likelihood")
+    plt.plot(iteration_list, train_like_lst, label="train likelihood")
+
+    plt.xlabel("iteration number")
+    plt.ylabel("likelihood")
+    plt.title('log-likelihood of training and validation VS num of iteration')
+    plt.legend()
+    plt.show()
+
+    # part c
+    # report the final validation and test accuracies
+    valid_acc = evaluate(val_data, theta, beta)
+    test_acc = evaluate(test_data, theta, beta)
+    print("The final accuracy for validation set is {}".format(valid_acc))
+    print("The final accuracy for test set is {}".format(test_acc))
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
 
     #####################################################################
     # TODO:                                                             #
-    # Implement part (d)                                                #
+    # Implement part (d)
+    for j in range(1, 4):
+        sorted_theta_list = np.sort(theta)
+        p_correct = np.exp(-np.logaddexp(0, beta[j] - sorted_theta_list))
+        plt.plot(sorted_theta_list, p_correct, label="j_{}".format(j))
+    plt.title("correct response vs theta")
+    plt.ylabel("probability")
+    plt.xlabel("theta")
+    plt.legend()
+    plt.show()
     #####################################################################
     pass
     #####################################################################
