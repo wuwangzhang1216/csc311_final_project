@@ -24,7 +24,23 @@ def neg_log_likelihood(data, theta, beta):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    log_lklihood = 0.
+
+    # initialize some variables
+    user_id = data["user_id"]
+    question_id = data["question_id"]
+    is_correct = data["is_correct"]
+
+    log_lklihood = 0
+    for i in range(len(is_correct)):
+        # if c_ij = 1
+        if is_correct[i]:
+            log_lklihood += theta[user_id[i]] - beta[question_id[i]] \
+                            - np.logaddexp(0, theta[user_id[i]] -
+                                           beta[question_id[i]])
+        # if c_ij = 0
+        else:
+            log_lklihood += - np.logaddexp(0, theta[user_id[i]] -
+                                           beta[question_id[i]])
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -52,7 +68,22 @@ def update_theta_beta(data, lr, theta, beta):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    pass
+
+    # initialize some variables
+    user_id = data["user_id"]
+    question_id = data["question_id"]
+    is_correct = data["is_correct"]
+
+    for i in range(len(is_correct)):
+        # compute the derivatives
+        temp = sigmoid(theta[user_id[i]] - beta[question_id[i]])
+        grad_theta = is_correct[i] - temp
+        grad_beta = - grad_theta
+
+        # apply the update
+        theta[user_id[i]] += lr * grad_theta
+        beta[question_id[i]] += lr * grad_beta
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -73,16 +104,22 @@ def irt(data, val_data, lr, iterations):
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    theta = None
-    beta = None
+    theta = np.random.rand(542)     # num of students
+    beta = np.random.rand(1774)     # num of questions
 
     val_acc_lst = []
+    train_acc_lst = []
+    val_like_lst = []
+    train_like_lst = []
 
     for i in range(iterations):
-        neg_lld = neg_log_likelihood(data, theta=theta, beta=beta)
-        score = evaluate(data=val_data, theta=theta, beta=beta)
-        val_acc_lst.append(score)
-        print("NLLK: {} \t Score: {}".format(neg_lld, score))
+        neg_lld_train = neg_log_likelihood(data, theta=theta, beta=beta)
+        neg_lld_val = neg_log_likelihood(val_data, theta=theta, beta=beta)
+        score_train = evaluate(data=data, theta=theta, beta=beta)
+        score_val = evaluate(data=val_data, theta=theta, beta=beta)
+        val_acc_lst.append(score_val)
+        train_acc_lst.append(score_train)
+        # print("NLLK: {} \t Score: {}".format(neg_lld, score))
         theta, beta = update_theta_beta(data, lr, theta, beta)
 
     # TODO: You may change the return values to achieve what you want.
