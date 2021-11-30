@@ -1,3 +1,13 @@
+import os
+import sys
+# Adding parent directory to path (for importing utils)
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+sys.path.append(parent)
+
+# change current working directory to part_a to access data folder
+os.chdir("./part_a")
+
 from sklearn.impute import KNNImputer
 from utils import *
 from tabulate import tabulate
@@ -20,7 +30,7 @@ def knn_impute_by_user(matrix, valid_data, k):
     # We use NaN-Euclidean distance measure.
     mat = nbrs.fit_transform(matrix)
     acc = sparse_matrix_evaluate(valid_data, mat)
-    print("Validation Accuracy: {}".format(acc))
+    print(f"Validation Accuracy by user k={k}: {acc}")
     return acc
 
 
@@ -62,7 +72,7 @@ def knn_impute_by_item(matrix, valid_data, k):
     nbrs = KNNImputer(n_neighbors=k)
     mat = nbrs.fit_transform(matrix.T)
     acc = sparse_matrix_evaluate_item(valid_data, mat)
-    print("Validation Accuracy: {}".format(acc))
+    print(f"Validation Accuracy by item k={k}: {acc}")
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -90,7 +100,7 @@ def main():
     # Please make sure to comment out other parts when running a single part
     # part a and b should be ran at the same time
 
-    # part a
+    # part a - plot KNN impute by user for different values of K
     k_list = [1, 6, 11, 16, 21, 26]
     accuracy_list = []  # used to store the acc for each k
     for k in k_list:
@@ -106,13 +116,14 @@ def main():
     plt.plot(k_list, accuracy_list)
     plt.show()
 
-    # part b
+    # part b -  use the kNN model with the best hyperparameter performance on validation set 
+    #           and output performance on test set
     best_k = k_list[accuracy_list.index(max(accuracy_list))]
     test_accuracy = knn_impute_by_user(sparse_matrix, test_data, best_k)
     print("The best performance k value for valid data is {}\n"
           "Its performance on test data is {}".format(best_k, test_accuracy))
     #####################################################################
-    # part c
+    # part c - repeat the above two part, but for kNN impute by item/questions
     k_list = [1, 6, 11, 16, 21, 26]
     accuracy_list = []  # used to store the acc for each k
     for k in k_list:
@@ -133,13 +144,13 @@ def main():
     print("The best performance k value for valid data is {}\n"
           "Its performance on test data is {}".format(best_k, test_accuracy))
     #####################################################################
-    # part d
+    # part d - compares the test performance between user- and item- based kNN
     k_list = [1, 6, 11, 16, 21, 26]
     _user = []
     _item = []
     for k in k_list:
-        _user.append(knn_impute_by_user(sparse_matrix, val_data, k))
-        _item.append(knn_impute_by_item(sparse_matrix, val_data, k))
+        _user.append(knn_impute_by_user(sparse_matrix, test_data, k))
+        _item.append(knn_impute_by_item(sparse_matrix, test_data, k))
     plt.plot(k_list, _user, label="user-based filtering")
     plt.plot(k_list, _item, label="item-based filtering")
     plt.xlabel("Values for k")
