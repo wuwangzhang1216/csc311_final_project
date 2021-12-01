@@ -1,17 +1,18 @@
-import os
-import sys
-# Adding parent directory to path (for importing utils)
-current = os.path.dirname(os.path.realpath(__file__))
-parent = os.path.dirname(current)
-sys.path.append(parent)
-
-# change current working directory to part_a to access data folder
-os.chdir("./part_a")
+# import os
+# import sys
+# # Adding parent directory to path (for importing utils)
+# current = os.path.dirname(os.path.realpath(__file__))
+# parent = os.path.dirname(current)
+# sys.path.append(parent)
+#
+# # change current working directory to part_a to access data folder
+# os.chdir("./part_a")
 
 from sklearn.impute import KNNImputer
 from utils import *
 from tabulate import tabulate
 import matplotlib.pyplot as plt
+
 
 def knn_impute_by_user(matrix, valid_data, k):
     """ Fill in the missing values using k-Nearest Neighbors based on
@@ -116,8 +117,8 @@ def main():
     plt.plot(k_list, accuracy_list)
     plt.show()
 
-    # part b -  use the kNN model with the best hyperparameter performance on validation set 
-    #           and output performance on test set
+    # part b -  use the kNN model with the best hyperparameter performance
+    # on validation set and output performance on test set
     best_k = k_list[accuracy_list.index(max(accuracy_list))]
     test_accuracy = knn_impute_by_user(sparse_matrix, test_data, best_k)
     print("The best performance k value for valid data is {}\n"
