@@ -33,15 +33,18 @@ def neg_log_likelihood(data, theta, beta):
 
     log_lklihood = 0
     for i in range(len(is_correct)):
-        # if c_ij = 1
-        if is_correct[i] == 1:
-            log_lklihood += theta[user_id[i]] - beta[question_id[i]] \
-                            - np.logaddexp(0, theta[user_id[i]] -
-                                           beta[question_id[i]])
-        # if c_ij = 0
-        else:
-            log_lklihood += - np.logaddexp(0, theta[user_id[i]] -
-                                           beta[question_id[i]])
+        log_lklihood += \
+            is_correct[i] * (theta[user_id[i]] - beta[question_id[i]]) - \
+            np.logaddexp(0, theta[user_id[i]] - beta[question_id[i]])
+        # # if c_ij = 1
+        # if is_correct[i] == 1:
+        #     log_lklihood += theta[user_id[i]] - beta[question_id[i]] \
+        #                     - np.logaddexp(0, theta[user_id[i]] -
+        #                                    beta[question_id[i]])
+        # # if c_ij = 0
+        # else:
+        #     log_lklihood += - np.logaddexp(0, theta[user_id[i]] -
+        #                                    beta[question_id[i]])
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
