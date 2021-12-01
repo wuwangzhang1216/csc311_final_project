@@ -1,12 +1,12 @@
-# import os
-# import sys
-# # Adding parent directory to path (for importing utils)
-# current = os.path.dirname(os.path.realpath(__file__))
-# parent = os.path.dirname(current)
-# sys.path.append(parent)
-#
-# # change current working directory to part_a to access data folder
-# os.chdir("./part_a")
+import os
+import sys
+# Adding parent directory to path (for importing utils)
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+sys.path.append(parent)
+
+# change current working directory to part_a to access data folder
+os.chdir("./part_a")
 
 from sklearn.impute import KNNImputer
 from utils import *
@@ -141,7 +141,7 @@ def main():
     plt.show()
 
     best_k = k_list[accuracy_list.index(max(accuracy_list))]
-    test_accuracy = knn_impute_by_user(sparse_matrix, test_data, best_k)
+    test_accuracy = knn_impute_by_item(sparse_matrix, test_data, best_k)
     print("The best performance k value for valid data is {}\n"
           "Its performance on test data is {}".format(best_k, test_accuracy))
     #####################################################################
