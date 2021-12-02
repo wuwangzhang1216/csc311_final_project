@@ -1,3 +1,12 @@
+# import os
+# import sys
+# # Adding parent directory to path (for importing utils)
+# current = os.path.dirname(os.path.realpath(__file__))
+# parent = os.path.dirname(current)
+# sys.path.append(parent)
+
+# # change current working directory to part_a to access data folder
+# os.chdir("./part_a")
 from utils import *
 from scipy.linalg import sqrtm
 from tabulate import tabulate
@@ -5,6 +14,7 @@ from tabulate import tabulate
 import numpy as np
 import matplotlib.pyplot as plt
 
+ITERATION_GAP = 2500
 
 def svd_reconstruct(matrix, k):
     """ Given the matrix, perform singular value decomposition
@@ -76,8 +86,7 @@ def update_u_z(train_data, lr, u, z):
     # Implement the function as described in the docstring.             #
     #####################################################################
     # Randomly select a pair (user_id, question_id).
-    i = \
-        np.random.choice(len(train_data["question_id"]), 1)[0]
+    i = np.random.choice(len(train_data["question_id"]), 1)[0]
 
     c = train_data["is_correct"][i]
     n = train_data["user_id"][i]
@@ -118,7 +127,7 @@ def als(train_data, val_data, k, lr, num_iteration):
     #####################################################################
     for i in range(num_iteration):
         update_u_z(train_data, lr, u, z)
-        if i % 2500 == 0:
+        if i % ITERATION_GAP == 0:
             val_error_list.append(squared_error_loss(val_data, u, z))
             train_error_list.append(squared_error_loss(train_data, u, z))
     mat = u @ z.T
@@ -157,8 +166,7 @@ def main():
     best_k = k_list[accuracy_list.index(max(accuracy_list))]
     best_reconstructed = svd_reconstruct(train_matrix, best_k)
     test_acc = sparse_matrix_evaluate(test_data, best_reconstructed)
-    print('the best k={} has a validation accuracy of {} and test accuracy of '
-          '{}'.format(best_k, max(accuracy_list), test_acc))
+    print(f'the best k={best_k} has a validation accuracy of {max(accuracy_list)} and test accuracy of {test_acc}')
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -190,7 +198,7 @@ def main():
           .format(best_k, max(accuracy_list)))
 
     # part e
-    # plot and report how the training and validation squared-errorlosses
+    # plot and report how the training and validation squared-error losses
     # change as a function of iteration
     # Note that the best performance k is 50 showed above and we choose the same
     # hyperparameters as above
@@ -199,7 +207,7 @@ def main():
     chosen_k = 50
     # val_error_list = []
     # train_error_list = []
-    iteration_list = [*range(1, num_iteration + 1, 2500)]
+    iteration_list = [*range(1, num_iteration + 1, ITERATION_GAP)]
 
     # compute the final matrix
     matrix, val_error_list, train_error_list = als(train_data, val_data, chosen_k, learning_rate, num_iteration)
@@ -208,7 +216,7 @@ def main():
     plt.plot(iteration_list, val_error_list, label="Validation")
     plt.xlabel("Iteration")
     plt.ylabel("Squared-Error Loss")
-    plt.title("Iteration VS Squared-Error Loss for k=50, l_r=0.01")
+    plt.title(f"Iteration VS Squared-Error Loss for k={chosen_k}, l_r={learning_rate}")
     plt.legend()
     plt.show()
 

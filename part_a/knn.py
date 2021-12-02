@@ -1,9 +1,9 @@
-import os
-import sys
-# Adding parent directory to path (for importing utils)
-current = os.path.dirname(os.path.realpath(__file__))
-parent = os.path.dirname(current)
-sys.path.append(parent)
+# import os
+# import sys
+# # Adding parent directory to path (for importing utils)
+# current = os.path.dirname(os.path.realpath(__file__))
+# parent = os.path.dirname(current)
+# sys.path.append(parent)
 
 # change current working directory to part_a to access data folder
 os.chdir("./part_a")
@@ -31,7 +31,7 @@ def knn_impute_by_user(matrix, valid_data, k):
     # We use NaN-Euclidean distance measure.
     mat = nbrs.fit_transform(matrix)
     acc = sparse_matrix_evaluate(valid_data, mat)
-    print(f"Validation Accuracy by user k={k}: {acc}")
+    print(f"Accuracy by user k={k}: {acc}")
     return acc
 
 
@@ -73,7 +73,7 @@ def knn_impute_by_item(matrix, valid_data, k):
     nbrs = KNNImputer(n_neighbors=k)
     mat = nbrs.fit_transform(matrix.T)
     acc = sparse_matrix_evaluate_item(valid_data, mat)
-    print(f"Validation Accuracy by item k={k}: {acc}")
+    print(f"Accuracy by item k={k}: {acc}")
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
