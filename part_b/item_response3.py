@@ -133,7 +133,7 @@ def irt(data, val_data, lr, iterations):
     return theta, beta, val_acc_lst, data_acc_lst, val_like_lst, train_like_lst
 
 
-def evaluate(data, theta, beta):
+def evaluate(data, theta, beta, alpha, k):
     """Evaluate the model given data and return the accuracy.
     :param data: A dictionary {user_id: list, question_id: list,
     is_correct: list}
@@ -146,7 +146,7 @@ def evaluate(data, theta, beta):
     for i, q in enumerate(data["question_id"]):
         u = data["user_id"][i]
         x = (theta[u] - beta[q]).sum()
-        p_a = sigmoid(x)
+        p_a = k + (1 - k) * sigmoid(alpha[q])
         pred.append(p_a >= 0.5)
     return np.sum((data["is_correct"] == np.array(pred))) / len(data["is_correct"])
 
