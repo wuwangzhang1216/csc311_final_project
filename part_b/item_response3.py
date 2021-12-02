@@ -2,11 +2,67 @@ from utils import *
 
 import numpy as np
 import matplotlib.pyplot as plt
-
+import csv
 
 def sigmoid(x):
     """Apply sigmoid function."""
     return np.exp(x) / (1 + np.exp(x))
+
+
+def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
+    theta = np.full((542, 1), 1)
+    beta = np.full((1774, 1), 1)
+    elder = []
+    younger = []
+    with_pre = []
+    without_pre = []
+    with open(student_mata_data_path) as student_mata_data:
+        csv_reader = csv.reader(student_mata_data, delimiter=',')
+        for row in csv_reader:
+            student_id = row[0]
+            birthday = row[2]
+            premium = row[3]
+            if premium == 1:
+                with_pre.append(student_id)
+            else:
+                without_pre.append(student_id)
+            if int(birthday[:4]) < 2006:
+                elder.append(student_id)
+            else:
+                younger.append(student_id)
+
+    with open(student_mata_data_path) as student_mata_data:
+        csv_reader = csv.reader(student_mata_data, delimiter=',')
+        for row in csv_reader:
+            student_id = row[0]
+            if student_id in elder:
+                theta[student_id] += 0.5
+            else:
+                theta[student_id] -= 0.5
+            if student_id in with_pre:
+                theta[student_id] -= 0.2
+            else:
+                theta[student_id] += 0.2
+    counter = {}
+    with open(question_meta_data_path) as question_meta_data:
+        csv_reader = csv.reader(question_meta_data, delimiter=',')
+        for row in csv_reader:
+            subject_id = row[1]
+            if subject_id in counter:
+                counter[subject_id] += 1
+            else:
+                counter[subject_id] = 1
+    with open(question_meta_data_path) as question_meta_data:
+        csv_reader = csv.reader(question_meta_data, delimiter=',')
+        for row in csv_reader:
+            question_id = row[0]
+            subject_id = row[1]
+            if counter[subject_id] > 5:
+                beta[question_id] += 0.5
+            else:
+                beta[question_id] -= 0.5
+
+    return theta, beta
 
 
 def neg_log_likelihood(data, theta, beta, alpha, k):
