@@ -190,9 +190,12 @@ def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    # theta = np.full((542, 1), 0.5)
-    # beta = np.full((1774, 1), 0.5)
-    theta, beta = initialize_theta_beta("../data/student_meta.csv", "../data/question_meta.csv")
+    theta = np.full((542, 1), 0.5)
+    beta = np.full((1774, 1), 0.5)
+    # theta, beta = initialize_theta_beta("../data/student_meta.csv", "../data/question_meta.csv")
+
+    # theta = np.random.rand(542).reshape(-1,1)  # num of students
+    # beta = np.random.rand(1774).reshape(-1,1)  # num of questions
     k = 0.3
     alpha = np.full((1774, 1), 1)
 
@@ -260,7 +263,7 @@ def main():
         c_matrix[u, q] = c
         in_data_matrix[u, q] = 1
 
-    num_iterations = 26
+    num_iterations = 30
     lr = 0.01
     theta, beta, k, alpha, val_acc_lst = irt(
         train_data, val_data, lr, num_iterations, c_matrix, in_data_matrix
