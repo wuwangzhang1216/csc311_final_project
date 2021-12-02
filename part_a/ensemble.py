@@ -30,7 +30,11 @@ def bagging(data, sample_num):
            resemble_data(data, sample_num)]
 
 def find_best_k(bag, val_data):
-    """ Finds the best kNN hyperparameter
+    """ Find the best hyperparameter k for the given dataset
+    
+    :param bag: 2D sparse matrix
+    :param val_data: A dictionary {user_id: list, question_id: list,
+    is_correct: list}
     """
     k_list = [1, 6, 11, 16, 21, 26]
     accuracy_list = []  # used to store the acc for each k
