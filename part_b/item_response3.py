@@ -12,8 +12,8 @@ def sigmoid(x):
 def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
     # theta = np.full((542, 1), 1)
     # beta = np.full((1774, 1), 1)
-    theta = [1] * 542
-    beta = [1] * 1774
+    theta = [0.5] * 542
+    beta = [0.5] * 1774
     elder = []
     younger = []
     with_pre = []
@@ -46,13 +46,13 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
                 continue
             student_id = row[0]
             if student_id in elder:
-                theta[int(student_id)] += 0.5
+                theta[int(student_id)] += 0.01
             else:
-                theta[int(student_id)] -= 0.5
+                theta[int(student_id)] -= 0.01
             if student_id in with_pre:
-                theta[int(student_id)] -= 0.2
+                theta[int(student_id)] -= 0.01
             else:
-                theta[int(student_id)] += 0.2
+                theta[int(student_id)] += 0.01
     counter = {}
     with open(question_meta_data_path) as question_meta_data:
         csv_reader = csv.reader(question_meta_data, delimiter=',')
@@ -72,11 +72,11 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
             question_id = row[0]
             subject_id = row[1]
             if counter[subject_id] > 5:
-                beta[int(question_id)] += 0.5
+                beta[int(question_id)] += 0.01
             else:
-                beta[int(question_id)] -= 0.5
+                beta[int(question_id)] -= 0.01
 
-    return np.array(theta), np.array(beta)
+    return np.array([theta]).T, np.array([beta]).T
 
 
 def neg_log_likelihood(data, theta, beta, alpha, k):
@@ -184,7 +184,7 @@ def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
     # theta = np.full((542, 1), 0.5)
     # beta = np.full((1774, 1), 0.5)
     theta, beta = initialize_theta_beta("../data/student_meta.csv", "../data/question_meta.csv")
-    k = 0.3
+    k = 0.25
     alpha = np.full((1774, 1), 1)
 
     val_acc_lst = []
