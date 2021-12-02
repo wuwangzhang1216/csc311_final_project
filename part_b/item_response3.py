@@ -47,7 +47,7 @@ def neg_log_likelihood(data, theta, beta, alpha, k):
     return -log_lklihood
 
 
-def update_theta_beta(data, lr, theta, beta, alpha, k):
+def update(data, lr, theta, beta, alpha, k, c_matrix, in_data_matrix):
     """Update theta and beta using gradient descent.
 
     You are using alternating gradient descent. Your update should look:
@@ -68,34 +68,36 @@ def update_theta_beta(data, lr, theta, beta, alpha, k):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
+    t = theta.copy()
+    b = beta.copy()
+    k2 = k
+    a = alpha.copy()
+    diff = (np.subtract.outer(t[:, 0], b[:, 0]).T * a).T
+    tb_diff = np.subtract.outer(t[:, 0], b[:, 0]) * np.exp(diff)
+    r_diff = k2 + np.exp(diff)
+    k_diff = (np.exp(diff).T * a).T
 
-    # initialize some variables
-    user_id = data["user_id"]
-    question_id = data["question_id"]
-    is_correct = data["is_correct"]
+    d_theta = c_matrix * (k_diff / r_diff) - k_diff / (1 + np.exp(diff))
+    d_beta = np.dot((-1 * d_theta * in_data_matrix).T, np.ones((542, 1)))
+    d_theta = np.dot(d_theta * in_data_matrix, np.ones((1774, 1)))
+    d_k = np.dot(
+        (
+            (-1 * tb_diff / (1 + np.exp(diff)) + c_matrix * tb_diff / r_diff)
+            * in_data_matrix
+        ).T,
+        np.ones((542, 1)),
+    )
 
-    theta_gradient = np.zeros(len(theta))
-    beta_gradient = np.zeros(len(beta))
-
-    for i in range(len(is_correct)):
-        # compute the derivatives
-        temp = sigmoid(theta[user_id[i]] - beta[question_id[i]])
-        grad_theta = is_correct[i] - temp
-        grad_beta = -grad_theta
-        # apply the update to theta_gradient/beta_gradient
-        theta_gradient[user_id[i]] += grad_theta
-        beta_gradient[question_id[i]] += grad_beta
-    # apply the update
-    theta += lr * theta_gradient
-    beta += lr * beta_gradient
-
+    theta += lr * d_theta
+    beta += lr * d_beta
+    alpha = alpha + lr * d_k
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
-    return theta, beta
+    return theta, beta, k, alpha
 
 
-def irt(data, val_data, lr, iterations):
+def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
     """Train IRT model.
 
     You may optionally replace the function arguments to receive a matrix.
@@ -109,28 +111,28 @@ def irt(data, val_data, lr, iterations):
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    theta = np.random.rand(542)  # num of students
-    beta = np.random.rand(1774)  # num of questions
+    theta = np.full((542, 1), 0.5)
+    beta = np.full((1774, 1), 0.5)
+    k = 0.3
+    alpha = np.full((1774, 1), 1)
 
     val_acc_lst = []
-    data_acc_lst = []
-    val_like_lst = []
-    train_like_lst = []
 
     for i in range(iterations):
-        neg_lld_train = neg_log_likelihood(data, theta=theta, beta=beta)
-        neg_lld_val = neg_log_likelihood(val_data, theta=theta, beta=beta)
-        score_data = evaluate(data=data, theta=theta, beta=beta)
-        score_val = evaluate(data=val_data, theta=theta, beta=beta)
-        val_acc_lst.append(score_val)
-        data_acc_lst.append(score_data)
-        val_like_lst.append(-neg_lld_val)
-        train_like_lst.append(-neg_lld_train)
-        # print("NLLK: {} \t Score: {}".format(neg_lld, score))
-        theta, beta = update_theta_beta(data, lr, theta, beta)
+        neg_lld = neg_log_likelihood(
+            data, theta=theta[:, 0], beta=beta[:, 0], k=k, alpha=alpha[:, 0]
+        )
+        score = evaluate(
+            data=val_data, theta=theta[:, 0], beta=beta[:, 0], k=k, alpha=alpha[:, 0]
+        )
+        val_acc_lst.append(score)
+        print("NLLK: {} \t Score: {}".format(neg_lld, score))
+        theta, beta, k, alpha = update(
+            data, lr, theta, beta, alpha, k, c_matrix, in_data_matrix
+        )
 
     # TODO: You may change the return values to achieve what you want.
-    return theta, beta, val_acc_lst, data_acc_lst, val_like_lst, train_like_lst
+    return theta, beta, k, alpha, val_acc_lst
 
 
 def evaluate(data, theta, beta, alpha, k):
@@ -146,7 +148,7 @@ def evaluate(data, theta, beta, alpha, k):
     for i, q in enumerate(data["question_id"]):
         u = data["user_id"][i]
         x = (theta[u] - beta[q]).sum()
-        p_a = k + (1 - k) * sigmoid(alpha[q])
+        p_a = k + (1 - k) * sigmoid(alpha[q] * x)
         pred.append(p_a >= 0.5)
     return np.sum((data["is_correct"] == np.array(pred))) / len(data["is_correct"])
 
@@ -163,61 +165,56 @@ def main():
     # Tune learning rate and number of iterations. With the implemented #
     # code, report the validation and test accuracy.                    #
     #####################################################################
-    learning_rate = 0.001
-    number_of_iteration = 150
-    iteration_list = [*range(1, number_of_iteration + 1, 1)]
-    theta, beta, val_acc_list, train_acc_list, val_like_lst, train_like_lst = irt(
-        train_data, val_data, learning_rate, number_of_iteration
+
+    c_matrix = np.zeros((542, 1774))
+    in_data_matrix = np.zeros((542, 1774))
+
+    users = train_data["user_id"]
+    questions = train_data["question_id"]
+    is_correct = train_data["is_correct"]
+    for i in range(len(users)):
+        u = users[i]
+        q = questions[i]
+        c = is_correct[i]
+
+        c_matrix[u, q] = c
+        in_data_matrix[u, q] = 1
+
+    num_iterations = 26
+    lr = 0.01
+    theta, beta, k, alpha, val_acc_lst = irt(
+        train_data, val_data, lr, num_iterations, c_matrix, in_data_matrix
     )
 
-    # report the validation and test accuracy
-    plt.plot(val_acc_list, label="validation accuracy")
-    plt.plot(train_acc_list, label="training accuracy")
-    plt.title("Training Curve")
-    plt.xlabel("num of iteration")
-    plt.ylabel("accuracy")
-    plt.legend()
+    fig1 = plt.figure()
+    ax = fig1.add_axes([0, 0, 1, 1])
+    ax.set_xlabel("Iterations")
+    ax.set_ylabel("Accuracy")
+    plt.plot(
+        [i + 1 for i in range(num_iterations)], val_acc_lst, "-g", label="validation"
+    )
+    plt.legend(loc="upper right")
     plt.show()
 
-    # plot showing the training and valid log-likelihoods
-
-    plt.plot(iteration_list, val_like_lst, label="validation likelihood")
-    plt.plot(iteration_list, train_like_lst, label="train likelihood")
-
-    plt.xlabel("iteration number")
-    plt.ylabel("likelihood")
-    plt.title("log-likelihood of training and validation VS num of iteration")
-    plt.legend()
-    plt.show()
-
-    # part c
-    # report the final validation and test accuracies
-    valid_acc = evaluate(val_data, theta, beta)
-    test_acc = evaluate(test_data, theta, beta)
-    print("The final accuracy for validation set is {}".format(valid_acc))
-    print("The final accuracy for test set is {}".format(test_acc))
-
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
-
-    #####################################################################
-    # TODO:                                                             #
-    # Implement part (d)
-    for j in range(1, 4):
-        sorted_theta_list = np.sort(theta)
-        p_correct = np.exp(-np.logaddexp(0, beta[j] - sorted_theta_list))
-        plt.plot(sorted_theta_list, p_correct, label="j_{}".format(j))
-    plt.title("correct response vs theta")
-    plt.ylabel("probability")
-    plt.xlabel("theta")
-    plt.legend()
-    plt.show()
-    #####################################################################
-    pass
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
+    max_i = np.argmax(np.array(val_acc_lst))
+    print(
+        "The iteration value with the highest validation accuracy is "
+        + str(max_i + 1)
+        + " with an accuracy of "
+        + str(val_acc_lst[max_i])
+    )
+    print(
+        "The train accuracy is "
+        + str(evaluate(train_data, theta[:, 0], beta[:, 0], alpha[:, 0], k))
+    )
+    print(
+        "The val accuracy is "
+        + str(evaluate(val_data, theta[:, 0], beta[:, 0], alpha[:, 0], k))
+    )
+    print(
+        "The test accuracy is "
+        + str(evaluate(test_data, theta[:, 0], beta[:, 0], alpha[:, 0], k))
+    )
 
 
 if __name__ == "__main__":
