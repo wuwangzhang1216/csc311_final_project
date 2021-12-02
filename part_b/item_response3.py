@@ -167,8 +167,9 @@ def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    theta = np.full((542, 1), 0.5)
-    beta = np.full((1774, 1), 0.5)
+    # theta = np.full((542, 1), 0.5)
+    # beta = np.full((1774, 1), 0.5)
+    theta, beta = initialize_theta_beta("../data/student_meta.csv","../data/question_meta.csv")
     k = 0.3
     alpha = np.full((1774, 1), 1)
 
