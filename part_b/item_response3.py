@@ -1,4 +1,3 @@
-
 from utils import *
 
 import numpy as np
@@ -6,13 +5,12 @@ import matplotlib.pyplot as plt
 
 
 def sigmoid(x):
-    """ Apply sigmoid function.
-    """
+    """Apply sigmoid function."""
     return np.exp(x) / (1 + np.exp(x))
 
 
-def neg_log_likelihood(data, theta, beta):
-    """ Compute the negative log-likelihood.
+def neg_log_likelihood(data, theta, beta, alpha, k):
+    """Compute the negative log-likelihood.
 
     You may optionally replace the function arguments to receive a matrix.
 
@@ -27,24 +25,30 @@ def neg_log_likelihood(data, theta, beta):
     # Implement the function as described in the docstring.             #
     #####################################################################
 
-    # initialize some variables
-    user_id = data["user_id"]
-    question_id = data["question_id"]
+    # initialize some variabl；s
+    user_ids = data["user_id"]
+    question_ids = data["question_id"]
     is_correct = data["is_correct"]
 
     log_lklihood = 0
-    for i in range(len(is_correct)):
-        log_lklihood += \
-            is_correct[i] * (theta[user_id[i]] - beta[question_id[i]]) - \
-            np.logaddexp(0, theta[user_id[i]] - beta[question_id[i]])
+    for x in range(len(is_correct)):
+        # i-th student and j-th question
+        i, j, c = user_ids[x], question_ids[x], is_correct[x]
+        rate = alpha[j] * (theta[i] - beta[j])
+        log_lklihood += (
+            c * (np.log(k + np.exp(rate)) - np.log(1 - k))
+            + np.log(1 - k)
+            - np.log(1 + np.exp(rate))
+        )
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
     return -log_lklihood
 
 
-def update_theta_beta(data, lr, theta, beta):
-    """ Update theta and beta using gradient descent.
+def update_theta_beta(data, lr, theta, beta, alpha, k):
+    """Update theta and beta using gradient descent.
 
     You are using alternating gradient descent. Your update should look:
     for i in iterations ...
@@ -77,7 +81,7 @@ def update_theta_beta(data, lr, theta, beta):
         # compute the derivatives
         temp = sigmoid(theta[user_id[i]] - beta[question_id[i]])
         grad_theta = is_correct[i] - temp
-        grad_beta = - grad_theta
+        grad_beta = -grad_theta
         # apply the update to theta_gradient/beta_gradient
         theta_gradient[user_id[i]] += grad_theta
         beta_gradient[question_id[i]] += grad_beta
@@ -92,7 +96,7 @@ def update_theta_beta(data, lr, theta, beta):
 
 
 def irt(data, val_data, lr, iterations):
-    """ Train IRT model.
+    """Train IRT model.
 
     You may optionally replace the function arguments to receive a matrix.
 
@@ -130,7 +134,7 @@ def irt(data, val_data, lr, iterations):
 
 
 def evaluate(data, theta, beta):
-    """ Evaluate the model given data and return the accuracy.
+    """Evaluate the model given data and return the accuracy.
     :param data: A dictionary {user_id: list, question_id: list,
     is_correct: list}
 
@@ -144,8 +148,7 @@ def evaluate(data, theta, beta):
         x = (theta[u] - beta[q]).sum()
         p_a = sigmoid(x)
         pred.append(p_a >= 0.5)
-    return np.sum((data["is_correct"] == np.array(pred))) \
-           / len(data["is_correct"])
+    return np.sum((data["is_correct"] == np.array(pred))) / len(data["is_correct"])
 
 
 def main():
@@ -163,7 +166,9 @@ def main():
     learning_rate = 0.001
     number_of_iteration = 150
     iteration_list = [*range(1, number_of_iteration + 1, 1)]
-    theta, beta, val_acc_list, train_acc_list, val_like_lst, train_like_lst = irt(train_data, val_data, learning_rate, number_of_iteration)
+    theta, beta, val_acc_list, train_acc_list, val_like_lst, train_like_lst = irt(
+        train_data, val_data, learning_rate, number_of_iteration
+    )
 
     # report the validation and test accuracy
     plt.plot(val_acc_list, label="validation accuracy")
@@ -181,7 +186,7 @@ def main():
 
     plt.xlabel("iteration number")
     plt.ylabel("likelihood")
-    plt.title('log-likelihood of training and validation VS num of iteration')
+    plt.title("log-likelihood of training and validation VS num of iteration")
     plt.legend()
     plt.show()
 
