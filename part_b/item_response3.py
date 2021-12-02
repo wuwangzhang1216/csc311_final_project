@@ -1,3 +1,12 @@
+import os
+import sys
+# Adding parent directory to path (for importing utils)
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+sys.path.append(parent)
+
+# change current working directory to part_a to access data folder
+os.chdir("./part_a")
 from utils import *
 
 import numpy as np
@@ -76,7 +85,7 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
             else:
                 beta[int(question_id)] -= 0.5
 
-    return np.array(theta), np.array(beta)
+    return np.array(theta).reshape(-1,1), np.array(beta).reshape(-1,1)
 
 
 def neg_log_likelihood(data, theta, beta, alpha, k):
