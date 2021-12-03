@@ -175,8 +175,8 @@ def evaluate(data, theta, beta,C_mat, data_mask):
     :return: float
     """
     capability = np.subtract.outer(theta, beta)
-    sigmoid_cap = sigmoid(capability) 
-    pred_mat = (sigmoid_cap >= 0.5) 
+    one_parameter_logistic = sigmoid(capability) 
+    pred_mat = (one_parameter_logistic >= 0.5) 
     pred_correct = np.sum((pred_mat == C_mat) * data_mask)
 
     return pred_correct / np.sum(data_mask)

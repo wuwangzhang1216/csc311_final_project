@@ -23,6 +23,28 @@ def sigmoid(x):
     return np.exp(x) / (1 + np.exp(x))
 
 
+def build_data_mat(data):
+    """Build C_mat and datamask for the given data
+
+    :param data: A dictionary {user_id: list, question_id: list,
+    is_correct: list}
+    """
+    C_mat = np.zeros((N_STUDENTS, N_QUESTIONS))
+    data_mask = np.zeros((N_STUDENTS, N_QUESTIONS))
+
+    users = data["user_id"]
+    questions = data["question_id"]
+    is_correct = data["is_correct"]
+    for i in range(len(users)):
+        u = users[i]
+        q = questions[i]
+        c = is_correct[i]
+
+        C_mat[u, q] = c
+        data_mask[u, q] = 1
+    return C_mat, data_mask
+
+
 def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
     # theta = np.full((542, 1), 1)
     # beta = np.full((1774, 1), 1)
@@ -93,7 +115,7 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
     return np.array([theta]).T, np.array([beta]).T
 
 
-def neg_log_likelihood(data, theta, beta, alpha, k):
+def neg_log_likelihood(data, theta, beta, alpha, k, C_mat, data_mask):
     """Compute the negative log-likelihood.
 
     You may optionally replace the function arguments to receive a matrix.
@@ -102,23 +124,36 @@ def neg_log_likelihood(data, theta, beta, alpha, k):
     is_correct: list}
     :param theta: Vector
     :param beta: Vector
+    :param C_mat:       matrix containing all c_ij values
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise
     :return: float
     """
-    user_ids = data["user_id"]
-    question_ids = data["question_id"]
-    is_correct = data["is_correct"]
+    t, b = theta.reshape(-1,), beta.reshape(-1,)
+    capability = np.subtract.outer(t, b)  # (theta_i - beta_j) matrix
+    difference = (capability.T * alpha).T  # alpha * (theta - beta) matrix
+    exp_diff = np.exp(difference)  # exp{ alpha * (theta - beta)}
+    log_lklihood_mat = (
+        C_mat * (np.log(k + exp_diff) - np.log(1 - k))
+        + np.log(1 - k)
+        - np.log(1 + exp_diff)
+    ) * data_mask
+    return -np.sum(log_lklihood_mat)
 
-    log_lklihood = 0
-    for x in range(len(is_correct)):
-        # i-th student and j-th question
-        i, j, c = user_ids[x], question_ids[x], is_correct[x]
-        rate = alpha[j] * (theta[i] - beta[j])
-        log_lklihood += (
-            c * (np.log(k + np.exp(rate)) - np.log(1 - k))
-            + np.log(1 - k)
-            - np.log(1 + np.exp(rate))
-        )
-    return -log_lklihood
+    # user_ids = data["user_id"]
+    # question_ids = data["question_id"]
+    # is_correct = data["is_correct"]
+
+    # log_lklihood = 0
+    # for x in range(len(is_correct)):
+    #     # i-th student and j-th question
+    #     i, j, c = user_ids[x], question_ids[x], is_correct[x]
+    #     rate = alpha[j] * (theta[i] - beta[j])
+    #     log_lklihood += (
+    #         c * (np.log(k + np.exp(rate)) - np.log(1 - k))
+    #         + np.log(1 - k)
+    #         - np.log(1 + np.exp(rate))
+    #     )
+    # return -log_lklihood
 
 
 def update(lr, theta, beta, alpha, k, C_mat, data_mask):
@@ -130,43 +165,43 @@ def update(lr, theta, beta, alpha, k, C_mat, data_mask):
     :param alpha:       Vector shape (N_QUESTIONS, 1) - discrimination ability of questions
     :param k:           Scalar - psuedo-guessing parameter
     :param C_mat:       matrix containing all c_ij values
-    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise 
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise
     :return: tuples (theta, beta, alpha, k) of item response 3PL parameters
     """
     # refer to report for derivative of parameter dl/d_theta, dl/d_beta, dl/d_alpha
     # capability: matrix of student capability - (theta_i - beta_j)
     # difference: matrix of student capability scaled by discrimination - alpha_j * (theta_i - beta_j)
-    t, b = theta.reshape(-1,), beta.reshape( -1,) 
+    t, b = theta.reshape(-1,), beta.reshape(-1,)
 
     capability = np.subtract.outer(t, b)  # (theta_i - beta_j) matrix
-    difference = (capability.T * alpha).T # alpha * (theta - beta) matrix
-    exp_diff = np.exp(difference)         # exp{ alpha * (theta - beta)}
+    difference = (capability.T * alpha).T  # alpha * (theta - beta) matrix
+    exp_diff = np.exp(difference)  # exp{ alpha * (theta - beta)}
 
-    cap_exp = capability * exp_diff       # (theta - beta) * exp{ alpha (theta - beta)}
-    a_exp = (exp_diff.T * alpha).T        # alpha * exp{ alpha (theta - beta)}
-    
+    cap_exp = capability * exp_diff  # (theta - beta) * exp{ alpha (theta - beta)}
+    a_exp = (exp_diff.T * alpha).T  # alpha * exp{ alpha (theta - beta)}
+
     # the matrices have values for all i, j and depends on C_ij values and only
     # counting data from training set
-    
+
     # - So we populate matrices values depending on c_ij using C-mat
     # - then mask the matrices to count only the data we have
     # - sum for each over row-wise or column-wise (depending on the parameter) to
     # get derivative by @ np.ones()
 
     d_theta_mat = C_mat * (a_exp / (k + exp_diff)) - (a_exp / (1 + exp_diff))
-    d_beta = ( -d_theta_mat         * data_mask).T     @ np.ones((N_STUDENTS, 1))
-    d_theta =   d_theta_mat         * data_mask        @ np.ones((N_QUESTIONS, 1))
+    d_beta = (-d_theta_mat  * data_mask).T  @ np.ones((N_STUDENTS, 1))
+    d_theta = d_theta_mat   * data_mask     @ np.ones((N_QUESTIONS, 1))
     d_alpha = (
-        (C_mat * cap_exp / (k + exp_diff) - cap_exp / (1 + exp_diff))
-        * data_mask
+        (C_mat * cap_exp / (k + exp_diff) - cap_exp / (1 + exp_diff)) * data_mask
     ).T @ np.ones((N_STUDENTS, 1))
 
     theta += lr * d_theta
-    beta  += lr * d_beta
+    beta += lr * d_beta
     alpha += lr * d_alpha
     return theta, beta, alpha, k
 
-def irt(data, val_data, lr, iterations, theta, beta, k, c_matrix, in_data_matrix):
+
+def irt(data, val_data, lr, iterations, theta, beta, k, C_mat, data_mask, C_mat_val, data_mask_val):
     """Train IRT model.
 
     You may optionally replace the function arguments to receive a matrix.
@@ -177,8 +212,10 @@ def irt(data, val_data, lr, iterations, theta, beta, k, c_matrix, in_data_matrix
     is_correct: list}
     :param lr: float
     :param iterations: int
-    :param C_mat:       matrix containing all c_ij values
-    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise 
+    :param C_mat            matrix containing all c_ij values for training data
+    :param data_mask        matrix where ij is 1 if there is data and 0 otherwise for training data
+    :param C_mat_val        matrix containing all c_ij values for validation data
+    :param data_mask_val    matrix where ij is 1 if there is data and 0 otherwise for validation data
     :return: (theta, beta, val_acc_lst)
     """
 
@@ -188,43 +225,58 @@ def irt(data, val_data, lr, iterations, theta, beta, k, c_matrix, in_data_matrix
     alpha = np.ones((1774, 1))
 
     val_acc_lst = []
-
     for i in range(iterations):
-        neg_lld = neg_log_likelihood(
-            data, theta=theta.reshape(-1,), beta=beta.reshape(-1,), k=k, alpha=alpha.reshape(-1,)
-        )
-        score = evaluate(
-            data=val_data, theta=theta.reshape(-1,), beta=beta.reshape(-1,), k=k, alpha=alpha.reshape(-1,)
-        )
+        neg_lld = neg_log_likelihood(data, theta, beta, alpha, k, C_mat, data_mask)
+        score = evaluate(val_data, theta, beta, alpha, k, C_mat_val, data_mask_val)
         val_acc_lst.append(score)
         print(f"NLLK iter={i}:\t {neg_lld} \t Score: {score}")
-        theta, beta, alpha, k = update(
-            lr, theta, beta, alpha, k, c_matrix, in_data_matrix
-        )
+        theta, beta, alpha, k = update(lr, theta, beta, alpha, k, C_mat, data_mask)
 
     # TODO: You may change the return values to achieve what you want.
     return theta, beta, alpha, k, val_acc_lst
 
 
-def evaluate(data, theta, beta, alpha, k):
+def evaluate(data, theta, beta, alpha, k, C_mat, data_mask):
     """Evaluate the model given data and return the accuracy.
     based on the item response theory 3PL formula
-    
+
     p(c=1 | theta) = k + (1-k) * sigmoid(alpha * (theta - beta))
 
     :param data: A dictionary {user_id: list, question_id: list,
     is_correct: list}
     :param theta: Vector
     :param beta: Vector
+    :param C_mat:       matrix containing all c_ij values
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise
     :return: float
     """
-    pred = []
-    for i, q in enumerate(data["question_id"]):
-        u = data["user_id"][i]
-        x = (theta[u] - beta[q]).sum()
-        p_a = k + (1 - k) * sigmoid(alpha[q] * x)
-        pred.append(p_a >= 0.5)
-    return np.sum((data["is_correct"] == np.array(pred))) / len(data["is_correct"])
+    theta, beta = theta.reshape(-1,), beta.reshape(
+        -1,
+    )
+    capability = np.subtract.outer(theta, beta)
+
+    sigmoid_cap = sigmoid(capability)
+    pred_mat = sigmoid_cap >= 0.5
+    pred_correct = np.sum((pred_mat == C_mat) * data_mask)
+
+    difference = (
+        np.subtract.outer(theta, beta).T * alpha
+    ).T  # alpha * (theta - beta) matrix
+
+    three_parameter_logistic = k + (1 - k) * sigmoid(difference)
+    pred_mat = three_parameter_logistic >= 0.5
+    pred_correct = np.sum((pred_mat == C_mat) * data_mask)
+
+    return pred_correct / np.sum(data_mask)
+    # alpha = alpha.reshape(-1,)
+    # pred = []
+    # for i, q in enumerate(data["question_id"]):
+    #     u = data["user_id"][i]
+    #     x = (theta[u] - beta[q]).sum()
+    #     p_a = k + (1 - k) * sigmoid(alpha[q] * x)
+    #     pred.append(p_a >= 0.5)
+    # n = np.sum((data["is_correct"] == np.array(pred)))
+    # return np.sum((data["is_correct"] == np.array(pred))) / len(data["is_correct"])
 
 
 def main():
@@ -240,7 +292,6 @@ def main():
     # code, report the validation and test accuracy.                    #
     #####################################################################
 
-
     # ======================================================== #
     # initialization
 
@@ -249,7 +300,7 @@ def main():
 
     # theta = np.random.rand(N_STUDENTS).reshape(-1,1)  # num of students
     # beta = np.random.rand(N_QUESTIONS).reshape(-1,1)  # num of questions
-    
+
     # heuristically assign ability and difficulty based on student/question metadata
     theta, beta = initialize_theta_beta(
         "../data/student_meta.csv", "../data/question_meta.csv"
@@ -266,22 +317,13 @@ def main():
     num_iterations = 30
     lr = 0.01
     # ======================================================== #
-    C_mat = np.zeros((N_STUDENTS, N_QUESTIONS))
-    data_mask = np.zeros((N_STUDENTS, N_QUESTIONS))
 
-    users = train_data["user_id"]
-    questions = train_data["question_id"]
-    is_correct = train_data["is_correct"]
-    for i in range(len(users)):
-        u = users[i]
-        q = questions[i]
-        c = is_correct[i]
-
-        C_mat[u, q] = c
-        data_mask[u, q] = 1
+    C_mat, data_mask = build_data_mat(train_data)
+    C_mat_val, data_mask_val = build_data_mat(val_data)
+    C_mat_test, data_mask_test = build_data_mat(test_data)
 
     theta, beta, alpha, k, val_acc_lst = irt(
-        train_data, val_data, lr, num_iterations, theta, beta, k, C_mat, data_mask
+        train_data, val_data, lr, num_iterations, theta, beta, k, C_mat, data_mask, C_mat_val, data_mask_val
     )
 
     fig1 = plt.figure()
@@ -303,19 +345,15 @@ def main():
     )
     print(
         "The train accuracy is "
-        + str(evaluate(train_data, theta.reshape(-1,), beta.reshape(-1,),
-            alpha.reshape(-1,), k))
+        + str(evaluate(train_data, theta, beta, alpha, k, C_mat, data_mask))
     )
     print(
         "The val accuracy is "
-        + str(evaluate(val_data, theta.reshape(-1,), beta.reshape(-1,),
-            alpha.reshape(-1,), k))
+        + str(evaluate(val_data, theta, beta, alpha, k, C_mat_val, data_mask_val))
     )
     print(
         "The test accuracy is "
-
-        + str(evaluate(test_data, theta.reshape(-1,), beta.reshape(-1,),
-            alpha.reshape(-1,), k))
+        + str(evaluate(test_data, theta, beta, alpha, k, C_mat_test, data_mask_test))
     )
 
 
