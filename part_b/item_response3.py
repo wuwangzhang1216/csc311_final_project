@@ -104,12 +104,6 @@ def neg_log_likelihood(data, theta, beta, alpha, k):
     :param beta: Vector
     :return: float
     """
-    #####################################################################
-    # TODO:                                                             #
-    # Implement the function as described in the docstring.             #
-    #####################################################################
-
-    # initialize some variabl；s
     user_ids = data["user_id"]
     question_ids = data["question_id"]
     is_correct = data["is_correct"]
@@ -124,10 +118,6 @@ def neg_log_likelihood(data, theta, beta, alpha, k):
             + np.log(1 - k)
             - np.log(1 + np.exp(rate))
         )
-
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
     return -log_lklihood
 
 
@@ -140,7 +130,7 @@ def update(lr, theta, beta, alpha, k, C_mat, data_mask):
     :param alpha:       Vector shape (N_QUESTIONS, 1) - discrimination ability of questions
     :param k:           Scalar - psuedo-guessing parameter
     :param C_mat:       matrix containing all c_ij values
-    :param data_mask    matrix where ij is 1 if we have data and 0 if we don't 
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise 
     :return: tuples (theta, beta, alpha, k) of item response 3PL parameters
     """
     # refer to report for derivative of parameter dl/d_theta, dl/d_beta, dl/d_alpha
@@ -176,7 +166,7 @@ def update(lr, theta, beta, alpha, k, C_mat, data_mask):
     alpha += lr * d_alpha
     return theta, beta, alpha, k
 
-def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
+def irt(data, val_data, lr, iterations, theta, beta, k, c_matrix, in_data_matrix):
     """Train IRT model.
 
     You may optionally replace the function arguments to receive a matrix.
@@ -187,22 +177,10 @@ def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
     is_correct: list}
     :param lr: float
     :param iterations: int
+    :param C_mat:       matrix containing all c_ij values
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise 
     :return: (theta, beta, val_acc_lst)
     """
-    # TODO: Initialize theta and beta.
-    # theta = np.full((542, 1), 0.5)
-    # beta = np.full((1774, 1), 0.5)
-    theta, beta = initialize_theta_beta(
-        "../data/student_meta.csv", "../data/question_meta.csv"
-    )
-
-    # theta = np.random.rand(542).reshape(-1,1)  # num of students
-    # beta = np.random.rand(1774).reshape(-1,1)  # num of questions
-
-    # psuedo-guessing parameter, since we have 4 possible answer to a question
-    # and assuming none of the answer are trivially false, then 1/4 = 0.25 is
-    # the psuedo-guessing parameter
-    k = 0.25
 
     # no discrimination of questions' ability to differentiate between how
     # competent the student is and how diffucult the question is thus a_i = 1
@@ -213,13 +191,13 @@ def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
 
     for i in range(iterations):
         neg_lld = neg_log_likelihood(
-            data, theta=theta[:, 0], beta=beta[:, 0], k=k, alpha=alpha[:, 0]
+            data, theta=theta.reshape(-1,), beta=beta.reshape(-1,), k=k, alpha=alpha.reshape(-1,)
         )
         score = evaluate(
-            data=val_data, theta=theta[:, 0], beta=beta[:, 0], k=k, alpha=alpha[:, 0]
+            data=val_data, theta=theta.reshape(-1,), beta=beta.reshape(-1,), k=k, alpha=alpha.reshape(-1,)
         )
         val_acc_lst.append(score)
-        print("NLLK: {} \t Score: {}".format(neg_lld, score))
+        print(f"NLLK iter={i}:\t {neg_lld} \t Score: {score}")
         theta, beta, alpha, k = update(
             lr, theta, beta, alpha, k, c_matrix, in_data_matrix
         )
@@ -230,9 +208,12 @@ def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
 
 def evaluate(data, theta, beta, alpha, k):
     """Evaluate the model given data and return the accuracy.
+    based on the item response theory 3PL formula
+    
+    p(c=1 | theta) = k + (1-k) * sigmoid(alpha * (theta - beta))
+
     :param data: A dictionary {user_id: list, question_id: list,
     is_correct: list}
-
     :param theta: Vector
     :param beta: Vector
     :return: float
@@ -259,8 +240,34 @@ def main():
     # code, report the validation and test accuracy.                    #
     #####################################################################
 
-    c_matrix = np.zeros((542, 1774))
-    in_data_matrix = np.zeros((542, 1774))
+
+    # ======================================================== #
+    # initialization
+
+    # theta = np.full((542, 1), 0.5)
+    # beta = np.full((1774, 1), 0.5)
+
+    # theta = np.random.rand(N_STUDENTS).reshape(-1,1)  # num of students
+    # beta = np.random.rand(N_QUESTIONS).reshape(-1,1)  # num of questions
+    
+    # heuristically assign ability and difficulty based on student/question metadata
+    theta, beta = initialize_theta_beta(
+        "../data/student_meta.csv", "../data/question_meta.csv"
+    )
+
+    # alpha is best suited to have initial value of 1 (no discrimonation)
+
+    # psuedo-guessing parameter, since we have 4 possible answer to a question
+    # and assuming none of the answer are trivially false, then 1/4 = 0.25 is
+    # the psuedo-guessing parameter
+    k = 0.25
+    # ======================================================== #
+    # hyperparameters
+    num_iterations = 30
+    lr = 0.01
+    # ======================================================== #
+    C_mat = np.zeros((N_STUDENTS, N_QUESTIONS))
+    data_mask = np.zeros((N_STUDENTS, N_QUESTIONS))
 
     users = train_data["user_id"]
     questions = train_data["question_id"]
@@ -270,13 +277,11 @@ def main():
         q = questions[i]
         c = is_correct[i]
 
-        c_matrix[u, q] = c
-        in_data_matrix[u, q] = 1
+        C_mat[u, q] = c
+        data_mask[u, q] = 1
 
-    num_iterations = 30
-    lr = 0.01
     theta, beta, alpha, k, val_acc_lst = irt(
-        train_data, val_data, lr, num_iterations, c_matrix, in_data_matrix
+        train_data, val_data, lr, num_iterations, theta, beta, k, C_mat, data_mask
     )
 
     fig1 = plt.figure()
@@ -289,7 +294,7 @@ def main():
     plt.legend(loc="upper right")
     plt.show()
 
-    max_i = np.argmax(np.array(val_acc_lst))
+    max_i = np.argmax((val_acc_lst))
     print(
         "The iteration value with the highest validation accuracy is "
         + str(max_i + 1)
@@ -298,15 +303,19 @@ def main():
     )
     print(
         "The train accuracy is "
-        + str(evaluate(train_data, theta[:, 0], beta[:, 0], alpha[:, 0], k))
+        + str(evaluate(train_data, theta.reshape(-1,), beta.reshape(-1,),
+            alpha.reshape(-1,), k))
     )
     print(
         "The val accuracy is "
-        + str(evaluate(val_data, theta[:, 0], beta[:, 0], alpha[:, 0], k))
+        + str(evaluate(val_data, theta.reshape(-1,), beta.reshape(-1,),
+            alpha.reshape(-1,), k))
     )
     print(
         "The test accuracy is "
-        + str(evaluate(test_data, theta[:, 0], beta[:, 0], alpha[:, 0], k))
+
+        + str(evaluate(test_data, theta.reshape(-1,), beta.reshape(-1,),
+            alpha.reshape(-1,), k))
     )
 
 
