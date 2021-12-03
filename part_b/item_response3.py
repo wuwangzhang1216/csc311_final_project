@@ -1,5 +1,6 @@
 import os
 import sys
+
 # Adding parent directory to path (for importing utils)
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -13,6 +14,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import csv
 
+N_STUDENTS = 542
+N_QUESTIONS = 1774
+
+
 def sigmoid(x):
     """Apply sigmoid function."""
     return np.exp(x) / (1 + np.exp(x))
@@ -21,14 +26,14 @@ def sigmoid(x):
 def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
     # theta = np.full((542, 1), 1)
     # beta = np.full((1774, 1), 1)
-    theta = [1] * 542
-    beta = [1] * 1774
+    theta = [0.5] * 542
+    beta = [0.5] * 1774
     elder = []
     younger = []
     with_pre = []
     without_pre = []
     with open(student_mata_data_path) as student_mata_data:
-        csv_reader = csv.reader(student_mata_data, delimiter=',')
+        csv_reader = csv.reader(student_mata_data, delimiter=",")
         for i, row in enumerate(csv_reader):
             if i == 0:
                 continue
@@ -49,22 +54,22 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
                 younger.append(student_id)
 
     with open(student_mata_data_path) as student_mata_data:
-        csv_reader = csv.reader(student_mata_data, delimiter=',')
+        csv_reader = csv.reader(student_mata_data, delimiter=",")
         for i, row in enumerate(csv_reader):
             if i == 0:
                 continue
             student_id = row[0]
             if student_id in elder:
-                theta[int(student_id)] += 0.5
+                theta[int(student_id)] += 0.01
             else:
-                theta[int(student_id)] -= 0.5
+                theta[int(student_id)] -= 0.01
             if student_id in with_pre:
-                theta[int(student_id)] -= 0.2
+                theta[int(student_id)] -= 0.01
             else:
-                theta[int(student_id)] += 0.2
+                theta[int(student_id)] += 0.01
     counter = {}
     with open(question_meta_data_path) as question_meta_data:
-        csv_reader = csv.reader(question_meta_data, delimiter=',')
+        csv_reader = csv.reader(question_meta_data, delimiter=",")
         for i, row in enumerate(csv_reader):
             if i == 0:
                 continue
@@ -74,18 +79,18 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
             else:
                 counter[subject_id] = 1
     with open(question_meta_data_path) as question_meta_data:
-        csv_reader = csv.reader(question_meta_data, delimiter=',')
+        csv_reader = csv.reader(question_meta_data, delimiter=",")
         for i, row in enumerate(csv_reader):
             if i == 0:
                 continue
             question_id = row[0]
             subject_id = row[1]
             if counter[subject_id] > 5:
-                beta[int(question_id)] += 0.5
+                beta[int(question_id)] += 0.01
             else:
-                beta[int(question_id)] -= 0.5
+                beta[int(question_id)] -= 0.01
 
-    return np.array(theta).reshape(-1,1), np.array(beta).reshape(-1,1)
+    return np.array([theta]).T, np.array([beta]).T
 
 
 def neg_log_likelihood(data, theta, beta, alpha, k):
@@ -139,41 +144,69 @@ def update(data, lr, theta, beta, alpha, k, c_matrix, in_data_matrix):
     :param data: A dictionary {user_id: list, question_id: list,
     is_correct: list}
     :param lr: float
-    :param theta: Vector
-    :param beta: Vector
-    :return: tuple of vectors
+    :param theta:   Vector shape (N_STUDENT, 1)   - students ability
+    :param beta:    Vector shape (N_QUESTIONS, 1) - questions difficulty
+    :param alpha:   Vector shape (N_QUESTIONS, 1) - discrimination ability of questions
+    :param k:       Scalar - psuedo-guessing parameter
+    :return: tuple of item response 3PL parameters
     """
-    #####################################################################
-    # TODO:                                                             #
-    # Implement the function as described in the docstring.             #
-    #####################################################################
-    t = theta.copy()
-    b = beta.copy()
-    k2 = k
-    a = alpha.copy()
-    diff = (np.subtract.outer(t[:, 0], b[:, 0]).T * a).T
-    tb_diff = np.subtract.outer(t[:, 0], b[:, 0]) * np.exp(diff)
-    r_diff = k2 + np.exp(diff)
-    k_diff = (np.exp(diff).T * a).T
-
-    d_theta = c_matrix * (k_diff / r_diff) - k_diff / (1 + np.exp(diff))
-    d_beta = np.dot((-1 * d_theta * in_data_matrix).T, np.ones((542, 1)))
-    d_theta = np.dot(d_theta * in_data_matrix, np.ones((1774, 1)))
-    d_k = np.dot(
-        (
-            (-1 * tb_diff / (1 + np.exp(diff)) + c_matrix * tb_diff / r_diff)
-            * in_data_matrix
-        ).T,
-        np.ones((542, 1)),
+    # refer to report for derivative of parameter dl/d_theta, dl/d_beta, dl/d_alpha
+    # capability: matrix of student capability - (theta_i - beta_j)
+    # difference: matrix of student capability scaled by discrimination - alpha_j * (theta_i - beta_j)
+    t, b = theta.reshape(-1,), beta.reshape(
+        -1,
     )
+    capability = np.subtract.outer(t, b)  # (theta_i - beta_j) matrix
+    difference = (capability.T * alpha).T
+    exp_diff = np.exp(difference)
+
+    cap_exp = capability * exp_diff
+    a_exp = (exp_diff.T * alpha).T
+
+    d_theta_mat = c_matrix * (a_exp / (k + exp_diff)) - (a_exp / (1 + exp_diff))
+    d_beta = ( -d_theta_mat         * in_data_matrix).T     @ np.ones((N_STUDENTS, 1))
+    d_theta =   d_theta_mat         * in_data_matrix        @ np.ones((N_QUESTIONS, 1))
+    d_alpha = (
+        (c_matrix * cap_exp / (k + exp_diff) - cap_exp / (1 + exp_diff))
+        * in_data_matrix
+    ).T @ np.ones((N_STUDENTS, 1))
 
     theta += lr * d_theta
     beta += lr * d_beta
-    alpha = alpha + lr * d_k
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
-    return theta, beta, k, alpha
+    alpha = alpha + lr * d_alpha
+    return theta, beta, alpha, k
+
+    # temporary backup FIXME
+    # t = theta
+    # b = beta
+    # k2 = k
+    # a = alpha
+    # diff = (np.subtract.outer(t[:, 0], b[:, 0]).T * a).T
+    # tb_diff = np.subtract.outer(t[:, 0], b[:, 0]) * np.exp(diff)
+    # r_diff = k2 + np.exp(diff)
+    # k_diff = (np.exp(diff).T * a).T
+
+    # d_theta = c_matrix * (k_diff / r_diff) - k_diff / (1 + np.exp(diff))
+    # d_beta = np.dot(
+    #     (-1 * d_theta * in_data_matrix).T,
+    #     np.ones((542, 1))
+    # )
+    # d_theta = np.dot(
+    #     d_theta * in_data_matrix,
+    #     np.ones((1774, 1))
+    # )
+    # d_k = np.dot(
+    #     (
+    #         (-1 * tb_diff / (1 + np.exp(diff)) + c_matrix * tb_diff / r_diff)
+    #         * in_data_matrix
+    #     ).T,
+    #     np.ones((542, 1)),
+    # )
+
+    # theta += lr * d_theta
+    # beta += lr * d_beta
+    # alpha = alpha + lr * d_k
+    # return theta, beta, alpha, k
 
 
 def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
@@ -190,14 +223,24 @@ def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    theta = np.full((542, 1), 0.5)
-    beta = np.full((1774, 1), 0.5)
-    # theta, beta = initialize_theta_beta("../data/student_meta.csv", "../data/question_meta.csv")
+    # theta = np.full((542, 1), 0.5)
+    # beta = np.full((1774, 1), 0.5)
+    theta, beta = initialize_theta_beta(
+        "../data/student_meta.csv", "../data/question_meta.csv"
+    )
 
     # theta = np.random.rand(542).reshape(-1,1)  # num of students
     # beta = np.random.rand(1774).reshape(-1,1)  # num of questions
-    k = 0.3
-    alpha = np.full((1774, 1), 1)
+
+    # psuedo-guessing parameter, since we have 4 possible answer to a question
+    # and assuming none of the answer are trivially false, then 1/4 = 0.25 is
+    # the psuedo-guessing parameter
+    k = 0.25
+
+    # no discrimination of questions' ability to differentiate between how
+    # competent the student is and how diffucult the question is thus a_i = 1
+    # initially a_j (theta_i - beta_j) = 1 * (theta_i - beta_j)
+    alpha = np.ones((1774, 1))
 
     val_acc_lst = []
 
@@ -210,12 +253,12 @@ def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
         )
         val_acc_lst.append(score)
         print("NLLK: {} \t Score: {}".format(neg_lld, score))
-        theta, beta, k, alpha = update(
+        theta, beta, alpha, k = update(
             data, lr, theta, beta, alpha, k, c_matrix, in_data_matrix
         )
 
     # TODO: You may change the return values to achieve what you want.
-    return theta, beta, k, alpha, val_acc_lst
+    return theta, beta, alpha, k, val_acc_lst
 
 
 def evaluate(data, theta, beta, alpha, k):
@@ -265,7 +308,7 @@ def main():
 
     num_iterations = 30
     lr = 0.01
-    theta, beta, k, alpha, val_acc_lst = irt(
+    theta, beta, alpha, k, val_acc_lst = irt(
         train_data, val_data, lr, num_iterations, c_matrix, in_data_matrix
     )
 
