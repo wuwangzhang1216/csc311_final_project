@@ -131,83 +131,50 @@ def neg_log_likelihood(data, theta, beta, alpha, k):
     return -log_lklihood
 
 
-def update(data, lr, theta, beta, alpha, k, c_matrix, in_data_matrix):
-    """Update theta and beta using gradient descent.
+def update(lr, theta, beta, alpha, k, C_mat, data_mask):
+    """Update theta and beta using alternating gradient descent.
 
-    You are using alternating gradient descent. Your update should look:
-    for i in iterations ...
-        theta <- new_theta
-        beta <- new_beta
-
-    You may optionally replace the function arguments to receive a matrix.
-
-    :param data: A dictionary {user_id: list, question_id: list,
-    is_correct: list}
     :param lr: float
-    :param theta:   Vector shape (N_STUDENT, 1)   - students ability
-    :param beta:    Vector shape (N_QUESTIONS, 1) - questions difficulty
-    :param alpha:   Vector shape (N_QUESTIONS, 1) - discrimination ability of questions
-    :param k:       Scalar - psuedo-guessing parameter
-    :return: tuple of item response 3PL parameters
+    :param theta:       Vector shape (N_STUDENT, 1)   - students ability
+    :param beta:        Vector shape (N_QUESTIONS, 1) - questions difficulty
+    :param alpha:       Vector shape (N_QUESTIONS, 1) - discrimination ability of questions
+    :param k:           Scalar - psuedo-guessing parameter
+    :param C_mat:       matrix containing all c_ij values
+    :param data_mask    matrix where ij is 1 if we have data and 0 if we don't 
+    :return: tuples (theta, beta, alpha, k) of item response 3PL parameters
     """
     # refer to report for derivative of parameter dl/d_theta, dl/d_beta, dl/d_alpha
     # capability: matrix of student capability - (theta_i - beta_j)
     # difference: matrix of student capability scaled by discrimination - alpha_j * (theta_i - beta_j)
-    t, b = theta.reshape(-1,), beta.reshape(
-        -1,
-    )
+    t, b = theta.reshape(-1,), beta.reshape( -1,) 
+
     capability = np.subtract.outer(t, b)  # (theta_i - beta_j) matrix
-    difference = (capability.T * alpha).T
-    exp_diff = np.exp(difference)
+    difference = (capability.T * alpha).T # alpha * (theta - beta) matrix
+    exp_diff = np.exp(difference)         # exp{ alpha * (theta - beta)}
 
-    cap_exp = capability * exp_diff
-    a_exp = (exp_diff.T * alpha).T
+    cap_exp = capability * exp_diff       # (theta - beta) * exp{ alpha (theta - beta)}
+    a_exp = (exp_diff.T * alpha).T        # alpha * exp{ alpha (theta - beta)}
+    
+    # the matrices have values for all i, j and depends on C_ij values and only
+    # counting data from training set
+    
+    # - So we populate matrices values depending on c_ij using C-mat
+    # - then mask the matrices to count only the data we have
+    # - sum for each over row-wise or column-wise (depending on the parameter) to
+    # get derivative by @ np.ones()
 
-    d_theta_mat = c_matrix * (a_exp / (k + exp_diff)) - (a_exp / (1 + exp_diff))
-    d_beta = ( -d_theta_mat         * in_data_matrix).T     @ np.ones((N_STUDENTS, 1))
-    d_theta =   d_theta_mat         * in_data_matrix        @ np.ones((N_QUESTIONS, 1))
+    d_theta_mat = C_mat * (a_exp / (k + exp_diff)) - (a_exp / (1 + exp_diff))
+    d_beta = ( -d_theta_mat         * data_mask).T     @ np.ones((N_STUDENTS, 1))
+    d_theta =   d_theta_mat         * data_mask        @ np.ones((N_QUESTIONS, 1))
     d_alpha = (
-        (c_matrix * cap_exp / (k + exp_diff) - cap_exp / (1 + exp_diff))
-        * in_data_matrix
+        (C_mat * cap_exp / (k + exp_diff) - cap_exp / (1 + exp_diff))
+        * data_mask
     ).T @ np.ones((N_STUDENTS, 1))
 
     theta += lr * d_theta
-    beta += lr * d_beta
-    alpha = alpha + lr * d_alpha
+    beta  += lr * d_beta
+    alpha += lr * d_alpha
     return theta, beta, alpha, k
-
-    # temporary backup FIXME
-    # t = theta
-    # b = beta
-    # k2 = k
-    # a = alpha
-    # diff = (np.subtract.outer(t[:, 0], b[:, 0]).T * a).T
-    # tb_diff = np.subtract.outer(t[:, 0], b[:, 0]) * np.exp(diff)
-    # r_diff = k2 + np.exp(diff)
-    # k_diff = (np.exp(diff).T * a).T
-
-    # d_theta = c_matrix * (k_diff / r_diff) - k_diff / (1 + np.exp(diff))
-    # d_beta = np.dot(
-    #     (-1 * d_theta * in_data_matrix).T,
-    #     np.ones((542, 1))
-    # )
-    # d_theta = np.dot(
-    #     d_theta * in_data_matrix,
-    #     np.ones((1774, 1))
-    # )
-    # d_k = np.dot(
-    #     (
-    #         (-1 * tb_diff / (1 + np.exp(diff)) + c_matrix * tb_diff / r_diff)
-    #         * in_data_matrix
-    #     ).T,
-    #     np.ones((542, 1)),
-    # )
-
-    # theta += lr * d_theta
-    # beta += lr * d_beta
-    # alpha = alpha + lr * d_k
-    # return theta, beta, alpha, k
-
 
 def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
     """Train IRT model.
@@ -254,7 +221,7 @@ def irt(data, val_data, lr, iterations, c_matrix, in_data_matrix):
         val_acc_lst.append(score)
         print("NLLK: {} \t Score: {}".format(neg_lld, score))
         theta, beta, alpha, k = update(
-            data, lr, theta, beta, alpha, k, c_matrix, in_data_matrix
+            lr, theta, beta, alpha, k, c_matrix, in_data_matrix
         )
 
     # TODO: You may change the return values to achieve what you want.
