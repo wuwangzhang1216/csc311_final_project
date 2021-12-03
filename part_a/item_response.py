@@ -31,6 +31,8 @@ def neg_log_likelihood(data, theta, beta, C_mat, data_mask):
     is_correct: list}
     :param theta: Vector
     :param beta: Vector
+    :param C_mat        matrix containing all c_ij values
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise 
     :return: float
     """
     #####################################################################
@@ -44,7 +46,6 @@ def neg_log_likelihood(data, theta, beta, C_mat, data_mask):
     log_lklihood_mat = (C_mat * capability - np.logaddexp(0, capability)) * data_mask
     log_lklihood = np.sum(log_lklihood_mat)
     return -log_lklihood
-
 
     # user_id = data["user_id"]
     # question_id = data["question_id"]
@@ -76,6 +77,8 @@ def update_theta_beta(data, lr, theta, beta, C_mat, data_mask):
     :param lr: float
     :param theta: Vector
     :param beta: Vector
+    :param C_mat        matrix containing all c_ij values
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise 
     :return: tuple of vectors
     """
     #####################################################################
@@ -84,11 +87,7 @@ def update_theta_beta(data, lr, theta, beta, C_mat, data_mask):
     #####################################################################
 
     # initialize some variables
-    t, b = theta.reshape(-1,), beta.reshape(
-        -1,
-    )
-
-    capability = np.subtract.outer(t, b)  # (theta_i - beta_j) matrix
+    capability = np.subtract.outer(theta, beta)  # (theta_i - beta_j) matrix
     sigmoid_cap = sigmoid(capability)
     d_theta_mat = C_mat - sigmoid_cap
     d_beta = (-d_theta_mat * data_mask).T @ np.ones((N_STUDENTS))
@@ -130,6 +129,10 @@ def irt(data, val_data, lr, iterations, C_mat, data_mask, C_mat_val, data_mask_v
     is_correct: list}
     :param lr: float
     :param iterations: int
+    :param C_mat            matrix containing all c_ij values for training data
+    :param data_mask        matrix where ij is 1 if there is data and 0 otherwise for training data
+    :param C_mat_val        matrix containing all c_ij values for validation data
+    :param data_mask_val    matrix where ij is 1 if there is data and 0 otherwise for validation data
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
@@ -143,12 +146,12 @@ def irt(data, val_data, lr, iterations, C_mat, data_mask, C_mat_val, data_mask_v
     train_like_lst = []
 
     for i in range(iterations):
-        t = theta.reshape(-1, )
-        b = beta.reshape(-1, )
-        neg_lld_train = neg_log_likelihood(data, t, b, C_mat, data_mask)
-        neg_lld_val = neg_log_likelihood(data, t, b, C_mat_val, data_mask_val)
-        score_data = evaluate(data, t, b, C_mat, data_mask)
-        score_val = evaluate(val_data, t, b, C_mat_val, data_mask_val)
+        theta = theta.reshape(-1, )
+        beta = beta.reshape(-1, )
+        neg_lld_train = neg_log_likelihood(data, theta, beta, C_mat, data_mask)
+        neg_lld_val = neg_log_likelihood(data, theta, beta, C_mat_val, data_mask_val)
+        score_data = evaluate(data, theta, beta, C_mat, data_mask)
+        score_val = evaluate(val_data, theta, beta, C_mat_val, data_mask_val)
         val_acc_lst.append(score_val)
         data_acc_lst.append(score_data)
         val_like_lst.append(-neg_lld_val)
@@ -167,6 +170,8 @@ def evaluate(data, theta, beta,C_mat, data_mask):
 
     :param theta: Vector
     :param beta: Vector
+    :param C_mat        matrix containing all c_ij values
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise 
     :return: float
     """
     capability = np.subtract.outer(theta, beta)
