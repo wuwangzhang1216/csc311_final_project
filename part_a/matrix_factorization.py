@@ -1,12 +1,12 @@
-# import os
-# import sys
-# # Adding parent directory to path (for importing utils)
-# current = os.path.dirname(os.path.realpath(__file__))
-# parent = os.path.dirname(current)
-# sys.path.append(parent)
+import os
+import sys
+# Adding parent directory to path (for importing utils)
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+sys.path.append(parent)
 
-# # change current working directory to part_a to access data folder
-# os.chdir("./part_a")
+# change current working directory to part_a to access data folder
+os.chdir("./part_a")
 from utils import *
 from scipy.linalg import sqrtm
 from tabulate import tabulate
@@ -130,6 +130,7 @@ def als(train_data, val_data, k, lr, num_iteration):
         if i % ITERATION_GAP == 0:
             val_error_list.append(squared_error_loss(val_data, u, z))
             train_error_list.append(squared_error_loss(train_data, u, z))
+            print(f"iteration {i + 1}")
     mat = u @ z.T
     #####################################################################
     #                       END OF YOUR CODE                            #
