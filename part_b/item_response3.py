@@ -76,7 +76,7 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path, train
             birthday = row[2]
             if birthday == "":
                 continue
-            premium = row[3]
+            # premium = row[3]
             # if premium == "":
             #     continue
             # if int(premium[:1]) == 1:
@@ -84,9 +84,9 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path, train
             # else:
             #     without_pre.append(student_id)
             if int(birthday[:4]) < 2006:
-                older.append(student_id)
+                older.append(int(student_id))
             else:
-                younger.append(student_id)
+                younger.append(int(student_id))
 
     for i, uid in enumerate(train_data["user_id"]):
         # older group
@@ -149,9 +149,9 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path, train
             # else:
             #     beta[int(question_id)] -= VARIATION
             if counter[subject_id] > 5:
-                more_appearance.append(question_id)
+                more_appearance.append(int(question_id))
             else:
-                less_appearance.append(question_id)
+                less_appearance.append(int(question_id))
 
     for i, qid in enumerate(train_data["question_id"]):
         # more_appearance group
