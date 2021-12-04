@@ -32,7 +32,7 @@ def neg_log_likelihood(data, theta, beta, C_mat, data_mask):
     :param theta: Vector
     :param beta: Vector
     :param C_mat        matrix containing all c_ij values
-    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise 
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise
     :return: float
     """
     #####################################################################
@@ -42,7 +42,7 @@ def neg_log_likelihood(data, theta, beta, C_mat, data_mask):
 
     # initialize some variables
     capability = np.subtract.outer(theta, beta)  # (theta_i - beta_j) matrix
-    
+
     log_lklihood_mat = (C_mat * capability - np.logaddexp(0, capability)) * data_mask
     log_lklihood = np.sum(log_lklihood_mat)
     return -log_lklihood
@@ -78,7 +78,7 @@ def update_theta_beta(data, lr, theta, beta, C_mat, data_mask):
     :param theta: Vector
     :param beta: Vector
     :param C_mat        matrix containing all c_ij values
-    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise 
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise
     :return: tuple of vectors
     """
     #####################################################################
@@ -115,7 +115,7 @@ def update_theta_beta(data, lr, theta, beta, C_mat, data_mask):
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
-    return theta, beta
+    # return theta, beta
 
 
 def irt(data, val_data, lr, iterations, C_mat, data_mask, C_mat_val, data_mask_val):
@@ -136,9 +136,10 @@ def irt(data, val_data, lr, iterations, C_mat, data_mask, C_mat_val, data_mask_v
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    theta = np.random.rand(N_STUDENTS)
-    beta = np.random.rand(N_QUESTIONS)
-
+    # theta = np.random.rand(N_STUDENTS)
+    # beta = np.random.rand(N_QUESTIONS)
+    theta = np.full((N_STUDENTS,1), 0.5)
+    beta = np.full((N_QUESTIONS,1), 0.5)
 
     val_acc_lst = []
     data_acc_lst = []
@@ -146,8 +147,12 @@ def irt(data, val_data, lr, iterations, C_mat, data_mask, C_mat_val, data_mask_v
     train_like_lst = []
 
     for i in range(iterations):
-        theta = theta.reshape(-1, )
-        beta = beta.reshape(-1, )
+        theta = theta.reshape(
+            -1,
+        )
+        beta = beta.reshape(
+            -1,
+        )
         neg_lld_train = neg_log_likelihood(data, theta, beta, C_mat, data_mask)
         neg_lld_val = neg_log_likelihood(data, theta, beta, C_mat_val, data_mask_val)
         score_data = evaluate(data, theta, beta, C_mat, data_mask)
@@ -156,14 +161,14 @@ def irt(data, val_data, lr, iterations, C_mat, data_mask, C_mat_val, data_mask_v
         data_acc_lst.append(score_data)
         val_like_lst.append(-neg_lld_val)
         train_like_lst.append(-neg_lld_train)
-        print(f"NLLK iter={i}:\t {neg_lld_train} \t Score: {score_data}")
+        print(f"NLLK iter={i + 1}:\t {neg_lld_train} \t Score: {score_val}")
         theta, beta = update_theta_beta(data, lr, theta, beta, C_mat, data_mask)
 
     # TODO: You may change the return values to achieve what you want.
     return theta, beta, val_acc_lst, data_acc_lst, val_like_lst, train_like_lst
 
 
-def evaluate(data, theta, beta,C_mat, data_mask):
+def evaluate(data, theta, beta, C_mat, data_mask):
     """Evaluate the model given data and return the accuracy.
     :param data: A dictionary {user_id: list, question_id: list,
     is_correct: list}
@@ -171,12 +176,12 @@ def evaluate(data, theta, beta,C_mat, data_mask):
     :param theta: Vector
     :param beta: Vector
     :param C_mat        matrix containing all c_ij values
-    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise 
+    :param data_mask    matrix where ij is 1 if there is data and 0 otherwise
     :return: float
     """
     capability = np.subtract.outer(theta, beta)
-    one_parameter_logistic = sigmoid(capability) 
-    pred_mat = (one_parameter_logistic >= 0.5) 
+    one_parameter_logistic = sigmoid(capability)
+    pred_mat = one_parameter_logistic >= 0.5
     pred_correct = np.sum((pred_mat == C_mat) * data_mask)
 
     return pred_correct / np.sum(data_mask)
@@ -187,6 +192,7 @@ def evaluate(data, theta, beta,C_mat, data_mask):
     #     p_a = sigmoid(x)
     #     pred.append(p_a >= 0.5)
     # return np.sum((data["is_correct"] == np.array(pred))) / len(data["is_correct"])
+
 
 def build_data_mat(data):
     """Build C_mat and datamask for the given data
@@ -209,6 +215,7 @@ def build_data_mat(data):
         data_mask[u, q] = 1
     return C_mat, data_mask
 
+
 def main():
     train_data = load_train_csv("../data")
     # You may optionally use the sparse matrix.
@@ -221,8 +228,8 @@ def main():
     # Tune learning rate and number of iterations. With the implemented #
     # code, report the validation and test accuracy.                    #
     #####################################################################
-    learning_rate = 0.001
-    number_of_iteration = 150
+    learning_rate = 0.003
+    number_of_iteration = 40
     iteration_list = [*range(1, number_of_iteration + 1, 1)]
 
     C_mat, data_mask = build_data_mat(train_data)
@@ -230,7 +237,19 @@ def main():
     C_mat_test, data_mask_test = build_data_mat(test_data)
 
     theta, beta, val_acc_list, train_acc_list, val_like_lst, train_like_lst = irt(
-        train_data, val_data, learning_rate, number_of_iteration, C_mat, data_mask, C_mat_val, data_mask_val
+        train_data,
+        val_data,
+        learning_rate,
+        number_of_iteration,
+        C_mat,
+        data_mask,
+        C_mat_val,
+        data_mask_val,
+    )
+
+    max_i = np.argmax((val_acc_list))
+    print(
+        f"The iteration value with the highest validation accuracy is {max_i + 1} with an accuracy of {val_acc_list[max_i]}"
     )
 
     # report the validation and test accuracy

@@ -1,13 +1,13 @@
-# import os
-# import sys
-#
-# # Adding parent directory to path (for importing utils)
-# current = os.path.dirname(os.path.realpath(__file__))
-# parent = os.path.dirname(current)
-# sys.path.append(parent)
-#
-# # change current working directory to part_a to access data folder
-# os.chdir("./part_a")
+import os
+import sys
+
+# Adding parent directory to path (for importing utils)
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+sys.path.append(parent)
+
+# change current working directory to part_a to access data folder
+os.chdir("./part_a")
 from utils import *
 from typing import List
 
@@ -299,6 +299,9 @@ def irt(
     data_acc_lst = []
     val_like_lst = []
     train_like_lst = []
+    theta = theta.copy()
+    beta = beta.copy()
+    alpha = alpha.copy()
 
     for i in range(iterations):
         neg_lld_train = neg_log_likelihood(data, theta, beta, alpha, k, C_mat, data_mask)
@@ -416,8 +419,8 @@ def main():
     k = 0.25
     # ======================================================== #
     # hyperparameters
-    num_iterations = 80
-    lr = 0.003
+    num_iterations = 100
+    lr = 0.01
     # ======================================================== #
 
     C_mat, data_mask = build_data_mat(train_data)
@@ -468,19 +471,19 @@ def main():
     avg_alpha = ( sum(alpha_older)/len(alpha_older) + sum(alpha_young)/len(alpha_young) + sum(alpha_more)/len(alpha_more) + sum(alpha_less)/len(alpha_less) ) / 4
     ialpha.append(avg_alpha)
 
-    final_theta = []
-    final_beta = []
-    final_alpha = []
+    final_theta = np.zeros((N_STUDENTS, 1))
+    final_beta = np.zeros((N_QUESTIONS, 1))
+    final_alpha = np.zeros((N_QUESTIONS, 1))
     for uid, qid in zip(train_data["user_id"], train_data["question_id"]):
-        if uid in older:
-            final_theta.append(itheta[0])
+        if int(uid) in older:
+            final_theta[uid] = itheta[0]
         else:
-            final_theta.append(itheta[1])
-        if qid in more_appearance:
-            final_beta.append(ibeta[0])
+            final_theta[uid] = itheta[1]
+        if int(qid) in more_appearance:
+            final_beta[qid] = ibeta[0]
         else:
-            final_beta.append(ibeta[1])
-        final_alpha.append(ialpha[0])
+            final_beta[qid] = ibeta[1]
+        final_alpha[qid] = ialpha[0]
 
     theta, beta, alpha, k, val_acc_list, train_acc_list, val_like_lst, train_like_lst= irt(
         train_data,
