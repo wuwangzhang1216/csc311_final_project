@@ -1,13 +1,13 @@
-import os
-import sys
-
-# Adding parent directory to path (for importing utils)
-current = os.path.dirname(os.path.realpath(__file__))
-parent = os.path.dirname(current)
-sys.path.append(parent)
-
-# change current working directory to part_a to access data folder
-os.chdir("./part_a")
+# import os
+# import sys
+#
+# # Adding parent directory to path (for importing utils)
+# current = os.path.dirname(os.path.realpath(__file__))
+# parent = os.path.dirname(current)
+# sys.path.append(parent)
+#
+# # change current working directory to part_a to access data folder
+# os.chdir("./part_a")
 from utils import *
 from typing import List
 
@@ -46,15 +46,27 @@ def build_data_mat(data):
     return C_mat, data_mask
 
 
-def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
+def initialize_theta_beta(student_mata_data_path, question_meta_data_path, train_data):
     # theta = np.full((542, 1), 1)
     # beta = np.full((1774, 1), 1)
-    theta = [0.5] * N_STUDENTS
-    beta = [0.5] * N_QUESTIONS
+    # theta = [0.5] * N_STUDENTS
+    # beta = [0.5] * N_QUESTIONS
+
     older = []
     younger = []
-    with_pre = []
-    without_pre = []
+    older_dic = {
+        "user_id": [],
+        "question_id": [],
+        "is_correct": []
+    }
+    younger_dic = {
+        "user_id": [],
+        "question_id": [],
+        "is_correct": []
+    }
+
+    # with_pre = []
+    # without_pre = []
     with open(student_mata_data_path) as student_mata_data:
         csv_reader = csv.reader(student_mata_data, delimiter=",")
         for i, row in enumerate(csv_reader):
@@ -65,31 +77,42 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
             if birthday == "":
                 continue
             premium = row[3]
-            if premium == "":
-                continue
-            if int(premium[:1]) == 1:
-                with_pre.append(student_id)
-            else:
-                without_pre.append(student_id)
+            # if premium == "":
+            #     continue
+            # if int(premium[:1]) == 1:
+            #     with_pre.append(student_id)
+            # else:
+            #     without_pre.append(student_id)
             if int(birthday[:4]) < 2006:
                 older.append(student_id)
             else:
                 younger.append(student_id)
 
-    with open(student_mata_data_path) as student_mata_data:
-        csv_reader = csv.reader(student_mata_data, delimiter=",")
-        for i, row in enumerate(csv_reader):
-            if i == 0:
-                continue
-            student_id = row[0]
-            if student_id in older:
-                theta[int(student_id)] += VARIATION
-            else:
-                theta[int(student_id)] -= VARIATION
-            if student_id in with_pre:
-                theta[int(student_id)] -= VARIATION
-            else:
-                theta[int(student_id)] += VARIATION
+    for i, uid in enumerate(train_data["user_id"]):
+        # older group
+        if uid in older:
+            older_dic["user_id"].append(uid)
+            older_dic["question_id"].append(train_data["question_id"][i])
+            older_dic["is_correct"].append(train_data["is_correct"][i])
+        # younger group
+        else:
+            younger_dic["user_id"].append(uid)
+            younger_dic["question_id"].append(train_data["question_id"][i])
+            younger_dic["is_correct"].append(train_data["is_correct"][i])
+            # with open(student_mata_data_path) as student_mata_data:
+    #     csv_reader = csv.reader(student_mata_data, delimiter=",")
+    #     for i, row in enumerate(csv_reader):
+    #         if i == 0:
+    #             continue
+    #         student_id = row[0]
+    #         if student_id in older:
+    #             theta[int(student_id)] += VARIATION
+    #         else:
+    #             theta[int(student_id)] -= VARIATION
+    #         if student_id in with_pre:
+    #             theta[int(student_id)] -= VARIATION
+    #         else:
+    #             theta[int(student_id)] += VARIATION
     counter = {}
     with open(question_meta_data_path) as question_meta_data:
         csv_reader = csv.reader(question_meta_data, delimiter=",")
@@ -101,6 +124,19 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
                 counter[subject_id] += 1
             else:
                 counter[subject_id] = 1
+
+    more_appearance = []
+    less_appearance = []
+    more_appearance_dict = {
+        "user_id": [],
+        "question_id": [],
+        "is_correct": []
+    }
+    less_appearance_dict = {
+        "user_id": [],
+        "question_id": [],
+        "is_correct": []
+    }
     with open(question_meta_data_path) as question_meta_data:
         csv_reader = csv.reader(question_meta_data, delimiter=",")
         for i, row in enumerate(csv_reader):
@@ -108,12 +144,29 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
                 continue
             question_id = row[0]
             subject_id = row[1]
+            # if counter[subject_id] > 5:
+            #     beta[int(question_id)] += VARIATION
+            # else:
+            #     beta[int(question_id)] -= VARIATION
             if counter[subject_id] > 5:
-                beta[int(question_id)] += VARIATION
+                more_appearance.append(question_id)
             else:
-                beta[int(question_id)] -= VARIATION
+                less_appearance.append(question_id)
 
-    return np.array([theta]).T, np.array([beta]).T
+    for i, qid in enumerate(train_data["question_id"]):
+        # more_appearance group
+        if qid in more_appearance:
+            more_appearance_dict["user_id"].append(train_data["user_id"][i])
+            more_appearance_dict["question_id"].append(qid)
+            more_appearance_dict["is_correct"].append(train_data["is_correct"][i])
+        # less_appearance group
+        else:
+            less_appearance_dict["user_id"].append(train_data["user_id"][i])
+            less_appearance_dict["question_id"].append(qid)
+            less_appearance_dict["is_correct"].append(train_data["is_correct"][i])
+
+    # return np.array([theta]).T, np.array([beta]).T
+    return older_dic, younger_dic, more_appearance_dict, less_appearance_dict, older, younger, more_appearance, less_appearance
 
 
 def neg_log_likelihood(data, theta, beta, alpha, k, C_mat, data_mask):
@@ -213,6 +266,7 @@ def irt(
     iterations,
     theta,
     beta,
+    alpha,
     k,
     C_mat,
     data_mask,
@@ -239,7 +293,7 @@ def irt(
     # no discrimination of questions' ability to differentiate between how
     # competent the student is and how diffucult the question is thus a_i = 1
     # initially a_j (theta_i - beta_j) = 1 * (theta_i - beta_j)
-    alpha = np.ones((1774, 1))
+    # alpha = np.ones((1774, 1))
 
     val_acc_lst = []
     data_acc_lst = []
@@ -304,9 +358,10 @@ def evaluate(data, theta, beta, alpha, k, C_mat, data_mask):
     # n = np.sum((data["is_correct"] == np.array(pred)))
     # return np.sum((data["is_correct"] == np.array(pred))) / len(data["is_correct"])
 
+
 def predictions(data, theta, beta, alpha, k)->List[int]:
     """ Return the IRT predictions given the 4 parameters
-    
+
     :param theta:       Vector shape (N_STUDENT, 1)   - students ability
     :param beta:        Vector shape (N_QUESTIONS, 1) - questions difficulty
     :param alpha:       Vector shape (N_QUESTIONS, 1) - discrimination ability of questions
@@ -321,6 +376,7 @@ def predictions(data, theta, beta, alpha, k)->List[int]:
         pred.append(p_a >= 0.5)
     pred = list(map(int, pred))
     return pred
+
 
 def competition_csv(theta, beta, alpha, k):
     private_test_data = load_private_test_csv("../data")
@@ -352,11 +408,6 @@ def main():
     # theta = np.random.rand(N_STUDENTS).reshape(-1,1)  # num of students
     # beta = np.random.rand(N_QUESTIONS).reshape(-1,1)  # num of questions
 
-    # heuristically assign ability and difficulty based on student/question metadata
-    theta, beta = initialize_theta_beta(
-        "../data/student_meta.csv", "../data/question_meta.csv"
-    )
-
     # alpha is best suited to have initial value of 1 (no discrimonation)
 
     # psuedo-guessing parameter, since we have 4 possible answer to a question
@@ -373,21 +424,78 @@ def main():
     C_mat_val, data_mask_val = build_data_mat(val_data)
     C_mat_test, data_mask_test = build_data_mat(test_data)
 
+
+    # initailize the parameters
+
+    # regroup the training data based on student/question metadata
+    older_dic, younger_dic, more_appearance_dict, less_appearance_dict, older, younger, more_appearance, less_appearance = initialize_theta_beta(
+        "../data/student_meta.csv", "../data/question_meta.csv", train_data
+    )
+
+    itheta = []
+    ibeta = []
+    ialpha = []
+
+    theta = np.zeros((542, 1))
+    beta = np.zeros((1774, 1))
+    alpha = np.ones((1774, 1))
+
+    # Train data for older students
+    C_mat_older, data_mask_older = build_data_mat(older_dic)
+    theta_older, beta_older, alpha_older, _, _, _, _, _ = irt(older_dic, val_data, 0.01, 25, theta, beta, alpha, k, C_mat_older, data_mask_older, C_mat_val, data_mask_val)
+    # Train data for younger students
+    C_mat_young, data_mask_young = build_data_mat(younger_dic)
+    theta_young, beta_young, alpha_young, _, _, _, _, _ = irt(younger_dic, val_data, 0.01, 25, theta, beta, alpha, k, C_mat_young, data_mask_young, C_mat_val, data_mask_val)
+
+    # Train data for more appeared questions
+    C_mat_more, data_mask_mroe = build_data_mat(more_appearance_dict)
+    theta_more, beta_more, alpha_more, _, _, _, _, _ = irt(more_appearance_dict, val_data, 0.01, 25, theta, beta, alpha, k, C_mat_more, data_mask_mroe, C_mat_val, data_mask_val)
+    # Train data for less appeared questions
+    C_mat_less, data_mask_less = build_data_mat(less_appearance_dict)
+    theta_less, beta_less, alpha_less, _, _, _, _, _ = irt(less_appearance_dict, val_data, 0.01, 25, theta, beta, alpha, k, C_mat_less, data_mask_less, C_mat_val, data_mask_val)
+
+    # add initial value theta for older
+    itheta.append(sum(theta_older)/len(theta_older))
+    # add initial value theta for young
+    itheta.append(sum(theta_young)/len(theta_young))
+
+    # add initial value beta for more appeared questions
+    ibeta.append(sum(beta_more)/len(beta_more))
+    # add initial value beta for more appeared questions
+    ibeta.append(sum(beta_less)/len(beta_less))
+
+    # add initial value alpha
+    avg_alpha = ( sum(alpha_older)/len(alpha_older) + sum(alpha_young)/len(alpha_young) + sum(alpha_more)/len(alpha_more) + sum(alpha_less)/len(alpha_less) ) / 4
+    ialpha.append(avg_alpha)
+
+    final_theta = []
+    final_beta = []
+    final_alpha = []
+    for uid, qid in zip(train_data["user_id"], train_data["question_id"]):
+        if uid in older:
+            final_theta.append(itheta[0])
+        else:
+            final_theta.append(itheta[1])
+        if qid in more_appearance:
+            final_beta.append(ibeta[0])
+        else:
+            final_beta.append(ibeta[1])
+        final_alpha.append(ialpha[0])
+
     theta, beta, alpha, k, val_acc_list, train_acc_list, val_like_lst, train_like_lst= irt(
         train_data,
         val_data,
         lr,
         num_iterations,
-        theta,
-        beta,
+        np.array([final_theta]).reshape(-1, 1),
+        np.array([final_beta]).reshape(-1, 1),
+        np.array([final_alpha]).reshape(-1, 1),
         k,
         C_mat,
         data_mask,
         C_mat_val,
         data_mask_val,
     )
-    
-    
 
     max_i = np.argmax((val_acc_list))
     print(
@@ -413,7 +521,6 @@ def main():
     plt.legend()
     plt.show()
 
-
     # plot showing the training and valid log-likelihoods
     iteration_list = [*range(1, num_iterations + 1, 1)]
     plt.plot(iteration_list, val_like_lst, label="validation likelihood")
@@ -424,5 +531,7 @@ def main():
     plt.title("log-likelihood of training and validation VS num of iteration")
     plt.legend()
     plt.show()
+
+
 if __name__ == "__main__":
     main()
