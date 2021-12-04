@@ -9,6 +9,7 @@ sys.path.append(parent)
 # change current working directory to part_a to access data folder
 os.chdir("./part_a")
 from utils import *
+from typing import List
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,7 +17,7 @@ import csv
 
 N_STUDENTS = 542
 N_QUESTIONS = 1774
-
+VARIATION = 0.1
 
 def sigmoid(x):
     """Apply sigmoid function."""
@@ -48,9 +49,9 @@ def build_data_mat(data):
 def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
     # theta = np.full((542, 1), 1)
     # beta = np.full((1774, 1), 1)
-    theta = [0.5] * 542
-    beta = [0.5] * 1774
-    elder = []
+    theta = [0.5] * N_STUDENTS
+    beta = [0.5] * N_QUESTIONS
+    older = []
     younger = []
     with_pre = []
     without_pre = []
@@ -71,7 +72,7 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
             else:
                 without_pre.append(student_id)
             if int(birthday[:4]) < 2006:
-                elder.append(student_id)
+                older.append(student_id)
             else:
                 younger.append(student_id)
 
@@ -81,14 +82,14 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
             if i == 0:
                 continue
             student_id = row[0]
-            if student_id in elder:
-                theta[int(student_id)] += 0.01
+            if student_id in older:
+                theta[int(student_id)] += VARIATION
             else:
-                theta[int(student_id)] -= 0.01
+                theta[int(student_id)] -= VARIATION
             if student_id in with_pre:
-                theta[int(student_id)] -= 0.01
+                theta[int(student_id)] -= VARIATION
             else:
-                theta[int(student_id)] += 0.01
+                theta[int(student_id)] += VARIATION
     counter = {}
     with open(question_meta_data_path) as question_meta_data:
         csv_reader = csv.reader(question_meta_data, delimiter=",")
@@ -108,9 +109,9 @@ def initialize_theta_beta(student_mata_data_path, question_meta_data_path):
             question_id = row[0]
             subject_id = row[1]
             if counter[subject_id] > 5:
-                beta[int(question_id)] += 0.01
+                beta[int(question_id)] += VARIATION
             else:
-                beta[int(question_id)] -= 0.01
+                beta[int(question_id)] -= VARIATION
 
     return np.array([theta]).T, np.array([beta]).T
 
@@ -128,7 +129,9 @@ def neg_log_likelihood(data, theta, beta, alpha, k, C_mat, data_mask):
     :param data_mask    matrix where ij is 1 if there is data and 0 otherwise
     :return: float
     """
-    t, b = theta.reshape(-1,), beta.reshape(-1,)
+    t, b = theta.reshape(-1,), beta.reshape(
+        -1,
+    )
     capability = np.subtract.outer(t, b)  # (theta_i - beta_j) matrix
     difference = (capability.T * alpha).T  # alpha * (theta - beta) matrix
     exp_diff = np.exp(difference)  # exp{ alpha * (theta - beta)}
@@ -171,7 +174,9 @@ def update(lr, theta, beta, alpha, k, C_mat, data_mask):
     # refer to report for derivative of parameter dl/d_theta, dl/d_beta, dl/d_alpha
     # capability: matrix of student capability - (theta_i - beta_j)
     # difference: matrix of student capability scaled by discrimination - alpha_j * (theta_i - beta_j)
-    t, b = theta.reshape(-1,), beta.reshape(-1,)
+    t, b = theta.reshape(-1,), beta.reshape(
+        -1,
+    )
 
     capability = np.subtract.outer(t, b)  # (theta_i - beta_j) matrix
     difference = (capability.T * alpha).T  # alpha * (theta - beta) matrix
@@ -189,8 +194,8 @@ def update(lr, theta, beta, alpha, k, C_mat, data_mask):
     # get derivative by @ np.ones()
 
     d_theta_mat = C_mat * (a_exp / (k + exp_diff)) - (a_exp / (1 + exp_diff))
-    d_beta = (-d_theta_mat  * data_mask).T  @ np.ones((N_STUDENTS, 1))
-    d_theta = d_theta_mat   * data_mask     @ np.ones((N_QUESTIONS, 1))
+    d_beta = (-d_theta_mat * data_mask).T @ np.ones((N_STUDENTS, 1))
+    d_theta = d_theta_mat * data_mask @ np.ones((N_QUESTIONS, 1))
     d_alpha = (
         (C_mat * cap_exp / (k + exp_diff) - cap_exp / (1 + exp_diff)) * data_mask
     ).T @ np.ones((N_STUDENTS, 1))
@@ -201,7 +206,19 @@ def update(lr, theta, beta, alpha, k, C_mat, data_mask):
     return theta, beta, alpha, k
 
 
-def irt(data, val_data, lr, iterations, theta, beta, k, C_mat, data_mask, C_mat_val, data_mask_val):
+def irt(
+    data,
+    val_data,
+    lr,
+    iterations,
+    theta,
+    beta,
+    k,
+    C_mat,
+    data_mask,
+    C_mat_val,
+    data_mask_val,
+):
     """Train IRT model.
 
     You may optionally replace the function arguments to receive a matrix.
@@ -225,15 +242,24 @@ def irt(data, val_data, lr, iterations, theta, beta, k, C_mat, data_mask, C_mat_
     alpha = np.ones((1774, 1))
 
     val_acc_lst = []
+    data_acc_lst = []
+    val_like_lst = []
+    train_like_lst = []
+
     for i in range(iterations):
-        neg_lld = neg_log_likelihood(data, theta, beta, alpha, k, C_mat, data_mask)
-        score = evaluate(val_data, theta, beta, alpha, k, C_mat_val, data_mask_val)
-        val_acc_lst.append(score)
-        print(f"NLLK iter={i}:\t {neg_lld} \t Score: {score}")
+        neg_lld_train = neg_log_likelihood(data, theta, beta, alpha, k, C_mat, data_mask)
+        neg_lld_val = neg_log_likelihood(val_data, theta, beta, alpha, k, C_mat_val, data_mask_val)
+        score_data = evaluate(data, theta, beta, alpha, k, C_mat, data_mask)
+        score_val = evaluate(val_data, theta, beta, alpha, k, C_mat_val, data_mask_val)
+        val_acc_lst.append(score_val)
+        data_acc_lst.append(score_data)
+        val_like_lst.append(-neg_lld_val)
+        train_like_lst.append(-neg_lld_train)
+        print(f"NLLK iter={i + 1}:\t {neg_lld_train} \t Score: {score_val}")
         theta, beta, alpha, k = update(lr, theta, beta, alpha, k, C_mat, data_mask)
 
     # TODO: You may change the return values to achieve what you want.
-    return theta, beta, alpha, k, val_acc_lst
+    return theta, beta, alpha, k, val_acc_lst, data_acc_lst, val_like_lst, train_like_lst
 
 
 def evaluate(data, theta, beta, alpha, k, C_mat, data_mask):
@@ -242,7 +268,7 @@ def evaluate(data, theta, beta, alpha, k, C_mat, data_mask):
 
     p(c=1 | theta) = k + (1-k) * sigmoid(alpha * (theta - beta))
 
-    :param data: A dictionary {user_id: list, question_id: list,
+    :param data: Adictionary {user_id: list, question_id: list,
     is_correct: list}
     :param theta: Vector
     :param beta: Vector
@@ -277,6 +303,31 @@ def evaluate(data, theta, beta, alpha, k, C_mat, data_mask):
     #     pred.append(p_a >= 0.5)
     # n = np.sum((data["is_correct"] == np.array(pred)))
     # return np.sum((data["is_correct"] == np.array(pred))) / len(data["is_correct"])
+
+def predictions(data, theta, beta, alpha, k)->List[int]:
+    """ Return the IRT predictions given the 4 parameters
+    
+    :param theta:       Vector shape (N_STUDENT, 1)   - students ability
+    :param beta:        Vector shape (N_QUESTIONS, 1) - questions difficulty
+    :param alpha:       Vector shape (N_QUESTIONS, 1) - discrimination ability of questions
+    :param k:           Scalar - psuedo-guessing parameter
+    """
+    theta, beta, alpha = alpha.reshape(-1,), beta.reshape(-1,), alpha.reshape(-1,)
+    pred = []
+    for i, q in enumerate(data["question_id"]):
+        u = data["user_id"][i]
+        x = (theta[u] - beta[q]).sum()
+        p_a = k + (1 - k) * sigmoid(alpha[q] * x)
+        pred.append(p_a >= 0.5)
+    pred = list(map(int, pred))
+    return pred
+
+def competition_csv(theta, beta, alpha, k):
+    private_test_data = load_private_test_csv("../data")
+    pred = predictions(private_test_data, theta, beta, alpha, k)
+    ans = private_test_data
+    ans["is_correct"] = pred
+    save_private_test_csv(ans)
 
 
 def main():
@@ -314,48 +365,64 @@ def main():
     k = 0.25
     # ======================================================== #
     # hyperparameters
-    num_iterations = 30
-    lr = 0.01
+    num_iterations = 100
+    lr = 0.003
     # ======================================================== #
 
     C_mat, data_mask = build_data_mat(train_data)
     C_mat_val, data_mask_val = build_data_mat(val_data)
     C_mat_test, data_mask_test = build_data_mat(test_data)
 
-    theta, beta, alpha, k, val_acc_lst = irt(
-        train_data, val_data, lr, num_iterations, theta, beta, k, C_mat, data_mask, C_mat_val, data_mask_val
+    theta, beta, alpha, k, val_acc_list, train_acc_list, val_like_lst, train_like_lst= irt(
+        train_data,
+        val_data,
+        lr,
+        num_iterations,
+        theta,
+        beta,
+        k,
+        C_mat,
+        data_mask,
+        C_mat_val,
+        data_mask_val,
     )
+    
+    
 
-    fig1 = plt.figure()
-    ax = fig1.add_axes([0, 0, 1, 1])
-    ax.set_xlabel("Iterations")
-    ax.set_ylabel("Accuracy")
-    plt.plot(
-        [i + 1 for i in range(num_iterations)], val_acc_lst, "-g", label="validation"
+    max_i = np.argmax((val_acc_list))
+    print(
+        f"The iteration value with the highest validation accuracy is {max_i + 1} with an accuracy of {val_acc_list[max_i]}"
     )
-    plt.legend(loc="upper right")
+    print(
+        f"The train accuracy is {evaluate(train_data, theta, beta, alpha, k, C_mat, data_mask)}"
+    )
+    print(
+        f"The val accuracy is {evaluate(val_data, theta, beta, alpha, k, C_mat_val, data_mask_val)}"
+    )
+    print(
+        f"The test accuracy is {evaluate(test_data, theta, beta, alpha, k, C_mat_test, data_mask_test)}"
+    )
+    competition_csv(theta, beta, alpha, k)
+
+    # report the validation and test accuracy
+    plt.plot(val_acc_list, label="validation accuracy")
+    plt.plot(train_acc_list, label="training accuracy")
+    plt.title("Training Curve")
+    plt.xlabel("num of iteration")
+    plt.ylabel("accuracy")
+    plt.legend()
     plt.show()
 
-    max_i = np.argmax((val_acc_lst))
-    print(
-        "The iteration value with the highest validation accuracy is "
-        + str(max_i + 1)
-        + " with an accuracy of "
-        + str(val_acc_lst[max_i])
-    )
-    print(
-        "The train accuracy is "
-        + str(evaluate(train_data, theta, beta, alpha, k, C_mat, data_mask))
-    )
-    print(
-        "The val accuracy is "
-        + str(evaluate(val_data, theta, beta, alpha, k, C_mat_val, data_mask_val))
-    )
-    print(
-        "The test accuracy is "
-        + str(evaluate(test_data, theta, beta, alpha, k, C_mat_test, data_mask_test))
-    )
 
+    # plot showing the training and valid log-likelihoods
+    iteration_list = [*range(1, num_iterations + 1, 1)]
+    plt.plot(iteration_list, val_like_lst, label="validation likelihood")
+    plt.plot(iteration_list, train_like_lst, label="train likelihood")
 
+    plt.xlabel("iteration number")
+    plt.ylabel("likelihood")
+    plt.title("log-likelihood of training and validation VS num of iteration")
+    plt.legend()
+    plt.show()
 if __name__ == "__main__":
     main()
