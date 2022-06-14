@@ -8,4 +8,4 @@ part_b package is the improvements of IRT algorithm. Run main.py to see performa
 
 Matrix completion algorithms – KNN, Item Response Theory and Neural Autoencoder. Part A contains the implementation of pre-defined algorithms, while Part B involves experiments to augment and improve the algorithms implemented in Part A.
 
-Please read report.pdf for more details.
+Please read [report.pdf](https://docs.google.com/document/d/1OA-bp-4g5E6Yrd8yy-kir0IQEL4T9sTbV--bpEMwjas/edit#) for more details.
